@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Prediction Markets AI</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -13,11 +14,14 @@
     --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
     --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
     --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
     --text:#dde2e8; --text2:#7d8896; --text3:#3d4754;
     --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
   }
   html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; overflow:hidden; }
   #app { display:flex; flex-direction:column; height:100vh; }
+
+  /* Header */
   #header { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
   .header-left { display:flex; align-items:center; gap:10px; }
   .logo-box { width:30px; height:30px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -26,9 +30,13 @@
   .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10px; color:var(--accent2); letter-spacing:0.06em; }
   .live-dot { width:5px; height:5px; background:var(--accent); border-radius:50%; animation:livepulse 2s ease-in-out infinite; }
   @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  /* Messages */
   #messages { flex:1; overflow-y:auto; padding:18px 16px; display:flex; flex-direction:column; gap:18px; scroll-behavior:smooth; }
   #messages::-webkit-scrollbar { width:3px; }
   #messages::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* Welcome */
   #welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:18px; padding:20px 16px; text-align:center; animation:fadeUp 0.4s ease; }
   @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
   .welcome-icon { width:52px; height:52px; background:var(--bg3); border:1px solid var(--border2); border-radius:14px; display:flex; align-items:center; justify-content:center; }
@@ -37,6 +45,8 @@
   .suggestions { display:flex; flex-direction:column; gap:7px; width:100%; max-width:420px; }
   .sug-btn { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:9px 13px; color:var(--text2); font-size:11px; font-family:var(--mono); cursor:pointer; text-align:left; transition:border-color 0.15s,color 0.15s,background 0.15s; line-height:1.5; }
   .sug-btn:hover { border-color:rgba(0,229,160,0.4); color:var(--accent); background:var(--accent-dim); }
+
+  /* Message rows */
   .msg { display:flex; gap:10px; animation:fadeUp 0.18s ease; }
   .msg.user { flex-direction:row-reverse; }
   .avatar { width:26px; height:26px; border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:9px; font-weight:500; letter-spacing:0.04em; }
@@ -45,6 +55,8 @@
   .bubble { max-width:calc(100% - 80px); padding:10px 14px; font-size:13px; line-height:1.65; border-radius:var(--radius); }
   .msg.user .bubble { background:var(--accent-dim); border:1px solid rgba(0,229,160,0.18); color:var(--text); border-radius:var(--radius) 3px var(--radius) var(--radius); }
   .msg.bot .bubble { background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:3px var(--radius) var(--radius) var(--radius); width:100%; }
+
+  /* Market card styles */
   .msg.bot .bubble h3 { font-family:var(--mono); font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); margin:14px 0 8px; padding-bottom:7px; border-bottom:1px solid var(--border); }
   .msg.bot .bubble h3:first-child { margin-top:2px; }
   .msg.bot .bubble .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; margin:6px 0; transition:border-color 0.15s; }
@@ -55,6 +67,8 @@
   .msg.bot .bubble .prob.high { color:var(--accent); }
   .msg.bot .bubble .prob.mid  { color:var(--amber); }
   .msg.bot .bubble .prob.low  { color:var(--red); }
+  .msg.bot .bubble .clickable-prob { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; transition:opacity 0.15s; }
+  .msg.bot .bubble .clickable-prob:hover { opacity:0.75; }
   .msg.bot .bubble .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); }
   .msg.bot .bubble .vol { font-family:var(--mono); font-size:11px; color:var(--text3); margin-left:auto; }
   .msg.bot .bubble .market-outcome { font-size:11px; color:var(--text2); margin-top:6px; font-style:italic; }
@@ -68,11 +82,31 @@
   .msg.bot .bubble li { font-size:13px; color:var(--text2); padding:3px 0 3px 14px; position:relative; }
   .msg.bot .bubble li::before { content:'›'; position:absolute; left:0; color:var(--accent); font-weight:500; }
   .error-msg { font-size:12px; color:var(--red); font-family:var(--mono); padding:8px 12px; background:var(--red-dim); border:1px solid rgba(255,77,109,0.2); border-radius:6px; }
+
+  /* Chart card */
+  .chart-card { background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:14px; margin:8px 0; animation:fadeUp 0.2s ease; }
+  .chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .chart-title { font-family:var(--mono); font-size:11px; color:var(--text2); letter-spacing:0.06em; flex:1; padding-right:10px; }
+  .chart-live-badge { font-family:var(--mono); font-size:9px; color:var(--accent); background:var(--accent-dim); border:1px solid rgba(0,229,160,0.25); padding:2px 8px; border-radius:4px; letter-spacing:0.06em; white-space:nowrap; }
+  .chart-close-btn { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0 4px; line-height:1; transition:color 0.15s; margin-left:8px; }
+  .chart-close-btn:hover { color:var(--text); }
+  .chart-wrap { position:relative; height:160px; }
+  .chart-loading { display:flex; align-items:center; justify-content:center; height:160px; font-family:var(--mono); font-size:11px; color:var(--text3); letter-spacing:0.06em; }
+  .chart-stats { display:flex; gap:16px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); flex-wrap:wrap; }
+  .chart-stat { display:flex; flex-direction:column; gap:2px; }
+  .chart-stat-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.06em; text-transform:uppercase; }
+  .chart-stat-value { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text); }
+  .chart-stat-value.up   { color:var(--accent); }
+  .chart-stat-value.down { color:var(--red); }
+
+  /* Typing */
   .typing { display:flex; gap:4px; align-items:center; padding:4px 2px; }
   .typing span { width:5px; height:5px; background:var(--text3); border-radius:50%; animation:bounce 1.1s infinite; }
   .typing span:nth-child(2) { animation-delay:0.18s; }
   .typing span:nth-child(3) { animation-delay:0.36s; }
   @keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
+
+  /* Input */
   #input-area { padding:12px 16px 14px; background:var(--bg2); border-top:1px solid var(--border); flex-shrink:0; }
   #input-wrap { display:flex; align-items:flex-end; gap:8px; background:var(--bg3); border:1px solid var(--border2); border-radius:var(--radius); padding:8px 8px 8px 14px; transition:border-color 0.15s; }
   #input-wrap:focus-within { border-color:rgba(0,229,160,0.35); }
@@ -117,7 +151,7 @@
         <div class="welcome-sub">Ask anything about prediction market odds, probability shifts, volume trends, or specific events across Polymarket, Kalshi, and more.</div>
       </div>
       <div class="suggestions">
-        <button class="sug-btn" onclick="useSuggestion(this)">› Top US election markets by volume right now</button>
+        <button class="sug-btn" onclick="useSuggestion(this)">› Top USA Politics & Government markets by volume</button>
         <button class="sug-btn" onclick="useSuggestion(this)">› Show pricing history for the next Fed rate decision</button>
         <button class="sug-btn" onclick="useSuggestion(this)">› Which markets have seen the biggest probability shifts this week?</button>
         <button class="sug-btn" onclick="useSuggestion(this)">› Top 10 crypto markets on Polymarket right now</button>
@@ -135,11 +169,14 @@
         </svg>
       </button>
     </div>
-    <div id="footer">powered by predexon · live market data</div>
+    <div id="footer">powered by predexon · omd · live market data · click any probability to chart</div>
   </div>
 </div>
+
 <script>
-  const BACKEND_URL = 'https://api.dataopenmind.com/public/predexon-chat';
+  const BACKEND_URL   = 'https://api.dataopenmind.com/public/predexon-chat';
+  const OMD_PRICES    = 'https://api.dataopenmind.com/public/get_daily_prices';
+  const LIVE_PRICE    = 'https://api.dataopenmind.com/public/get_live_price';
 
   const messagesEl = document.getElementById('messages');
   const welcomeEl  = document.getElementById('welcome');
@@ -158,7 +195,9 @@
     }
   ];
   let busy = false;
+  const chartInstances = {};
 
+  // ── Input handling ──────────────────────────────────────────
   inputEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
@@ -173,6 +212,7 @@
     send();
   }
 
+  // ── UI helpers ───────────────────────────────────────────────
   function hideWelcome() { if (welcomeEl) welcomeEl.style.display = 'none'; }
   function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
 
@@ -219,6 +259,7 @@
     row.appendChild(bubble);
     messagesEl.appendChild(row);
     scrollBottom();
+    return bubble;
   }
 
   function addErrorMsg(msg) {
@@ -231,6 +272,7 @@
 
   function setLoading(val) { busy = val; sendBtn.disabled = val; }
 
+  // ── Chat send ────────────────────────────────────────────────
   async function send() {
     const text = inputEl.value.trim();
     if (!text || busy) return;
@@ -245,7 +287,7 @@
       const res = await fetch(BACKEND_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, history: history })
+        body: JSON.stringify({ message: text, history })
       });
 
       removeTyping();
@@ -267,6 +309,229 @@
     } finally {
       setLoading(false);
       inputEl.focus();
+    }
+  }
+
+  // ── Price chart ──────────────────────────────────────────────
+  async function showPriceChart(el) {
+    const marketId = el.dataset.marketId;
+    const slug     = el.dataset.slug;
+    const exchange = el.dataset.exchange || 'Polymarket';
+    const title    = el.closest('.market-card')?.querySelector('.market-title')?.textContent || 'Market';
+    const chartId  = 'chart-' + marketId.replace(/[^a-z0-9]/gi, '_');
+
+    // Toggle — remove if already open
+    const existing = document.getElementById(chartId);
+    if (existing) { existing.remove(); return; }
+
+    // Insert chart card directly after the market card
+    const marketCard = el.closest('.market-card');
+    const chartCard  = document.createElement('div');
+    chartCard.className = 'chart-card';
+    chartCard.id = chartId;
+    chartCard.innerHTML = `
+      <div class="chart-header">
+        <div class="chart-title">${title.substring(0, 60)}${title.length > 60 ? '...' : ''}</div>
+        <div style="display:flex;align-items:center;gap:0;">
+          <span class="chart-live-badge" id="${chartId}-badge">LOADING</span>
+          <button class="chart-close-btn" onclick="document.getElementById('${chartId}').remove()">✕</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <div class="chart-loading" id="${chartId}-loading">Fetching price history...</div>
+        <canvas id="${chartId}-canvas" style="display:none;"></canvas>
+      </div>
+      <div class="chart-stats" id="${chartId}-stats" style="display:none;"></div>
+    `;
+    marketCard.insertAdjacentElement('afterend', chartCard);
+    scrollBottom();
+
+    try {
+      // Step 1: fetch full OMD historical daily prices (all history)
+      const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
+      const omdData = await omdRes.json();
+
+      // Extract Yes outcome close prices sorted by date
+      const prices = (omdData || [])
+        .filter(r => r.outcome === 'Yes' && r.close_price !== null)
+        .sort((a, b) => a.end_period_date.localeCompare(b.end_period_date))
+        .map(r => ({ date: r.end_period_date, price: parseFloat(r.close_price) }));
+
+      if (prices.length === 0) {
+        document.getElementById(`${chartId}-loading`).textContent = 'No price history available.';
+        return;
+      }
+
+      // Step 2: attempt live price via backend proxy (Polymarket only)
+      let livePrice = null;
+      let hasLive   = false;
+
+      if (exchange === 'Polymarket' && slug) {
+        try {
+          const liveRes  = await fetch(`${LIVE_PRICE}?slug=${encodeURIComponent(slug)}`);
+          const liveData = await liveRes.json();
+          if (liveData.price !== null && liveData.price !== undefined) {
+            livePrice = parseFloat(liveData.price);
+            hasLive   = true;
+          }
+        } catch (e) {
+          console.warn('Live price fetch failed, using OMD history only:', e);
+        }
+      }
+
+      // Step 3: build combined dataset
+      const labels = prices.map(p => {
+        const d = new Date(p.date + 'T00:00:00');
+        return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+      });
+      const data = prices.map(p => Math.round(p.price * 1000) / 10);
+
+      if (hasLive) {
+        const n = new Date();
+        labels.push(`${n.getMonth()+1}/${n.getDate()}/${String(n.getFullYear()).slice(2)} ▲`);
+        data.push(Math.round(livePrice * 1000) / 10);
+      }
+
+      // Step 4: compute stats
+      const firstPrice = data[0];
+      const prevPrice  = data[hasLive ? data.length - 2 : data.length - 1];
+      const currPrice  = data[data.length - 1];
+      const changeAll  = currPrice - firstPrice;
+      const change1d   = currPrice - prevPrice;
+
+      // Step 5: render chart
+      document.getElementById(`${chartId}-loading`).style.display = 'none';
+      const canvas = document.getElementById(`${chartId}-canvas`);
+      canvas.style.display = 'block';
+
+      // Live point styling
+      const pointColors = data.map((_, i) =>
+        hasLive && i === data.length - 1 ? '#4da6ff' : 'transparent'
+      );
+      const pointRadius = data.map((_, i) =>
+        hasLive && i === data.length - 1 ? 5 : 2
+      );
+
+      if (chartInstances[chartId]) {
+        chartInstances[chartId].destroy();
+        delete chartInstances[chartId];
+      }
+
+      chartInstances[chartId] = new Chart(canvas, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data,
+            borderColor: '#00e5a0',
+            borderWidth: 1.5,
+            pointBackgroundColor: pointColors,
+            pointBorderColor: pointColors,
+            pointRadius,
+            pointHoverRadius: 5,
+            fill: true,
+            backgroundColor: (ctx) => {
+              const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 140);
+              g.addColorStop(0, 'rgba(0,229,160,0.15)');
+              g.addColorStop(1, 'rgba(0,229,160,0)');
+              return g;
+            },
+            tension: 0.3,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 400 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#161c24',
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              titleColor: '#7d8896',
+              bodyColor: '#dde2e8',
+              titleFont: { family: "'IBM Plex Mono', monospace", size: 10 },
+              bodyFont: { family: "'IBM Plex Mono', monospace", size: 12 },
+              callbacks: {
+                title: (items) => {
+                  const lbl = items[0].label;
+                  return lbl.includes('▲') ? lbl.replace(' ▲', '') + ' · LIVE' : lbl;
+                },
+                label: (item) => ` ${item.raw.toFixed(1)}%`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: '#3d4754',
+                font: { family: "'IBM Plex Mono', monospace", size: 9 },
+                maxTicksLimit: 10,
+                maxRotation: 0
+              },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            },
+            y: {
+              min: Math.max(0,   Math.min(...data) - 5),
+              max: Math.min(100, Math.max(...data) + 5),
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: '#3d4754',
+                font: { family: "'IBM Plex Mono', monospace", size: 9 },
+                callback: v => v + '%'
+              },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            }
+          }
+        }
+      });
+
+      // Step 6: badge + stats
+      const badge = document.getElementById(`${chartId}-badge`);
+      if (hasLive) {
+        badge.textContent = 'LIVE';
+        badge.style.color = 'var(--accent)';
+        badge.style.background = 'var(--accent-dim)';
+        badge.style.borderColor = 'rgba(0,229,160,0.25)';
+      } else {
+        badge.textContent = 'EOD';
+        badge.style.color = 'var(--amber)';
+        badge.style.background = 'var(--amber-dim)';
+        badge.style.borderColor = 'rgba(240,165,0,0.25)';
+      }
+
+      const statsEl   = document.getElementById(`${chartId}-stats`);
+      const c1dClass  = change1d  >= 0 ? 'up' : 'down';
+      const cAllClass = changeAll >= 0 ? 'up' : 'down';
+
+      statsEl.style.display = 'flex';
+      statsEl.innerHTML = `
+        <div class="chart-stat">
+          <div class="chart-stat-label">Current</div>
+          <div class="chart-stat-value">${currPrice.toFixed(1)}%</div>
+        </div>
+        <div class="chart-stat">
+          <div class="chart-stat-label">1D Change</div>
+          <div class="chart-stat-value ${c1dClass}">${change1d >= 0 ? '+' : ''}${change1d.toFixed(1)}%</div>
+        </div>
+        <div class="chart-stat">
+          <div class="chart-stat-label">All-Time Change</div>
+          <div class="chart-stat-value ${cAllClass}">${changeAll >= 0 ? '+' : ''}${changeAll.toFixed(1)}%</div>
+        </div>
+        <div class="chart-stat" style="margin-left:auto;">
+          <div class="chart-stat-label">As of</div>
+          <div class="chart-stat-value" style="font-size:11px;">${hasLive ? 'Live' : 'Prior Day Close'}</div>
+        </div>
+      `;
+
+      scrollBottom();
+
+    } catch (err) {
+      document.getElementById(`${chartId}-loading`).textContent = 'Failed to load price data.';
+      console.error(err);
     }
   }
 </script>
