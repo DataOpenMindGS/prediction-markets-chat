@@ -15,7 +15,9 @@
     --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
     --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
     --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
-    --text:#dde2e8; --text2:#7d8896; --text3:#3d4754;
+    --text:#f0f2f5;
+    --text2:#c8cdd4;
+    --text3:#8a9099;
     --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
   }
   html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; overflow:hidden; }
@@ -32,7 +34,7 @@
   @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
 
   /* Messages */
-  #messages { flex:1; overflow-y:auto; padding:18px 16px; display:flex; flex-direction:column; gap:18px; scroll-behavior:smooth; }
+  #messages { flex:1; overflow-y:auto; padding:18px 16px; display:flex; flex-direction:column; gap:18px; }
   #messages::-webkit-scrollbar { width:3px; }
   #messages::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
 
@@ -70,8 +72,8 @@
   .msg.bot .bubble .clickable-prob { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; transition:opacity 0.15s; }
   .msg.bot .bubble .clickable-prob:hover { opacity:0.75; }
   .msg.bot .bubble .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); }
-  .msg.bot .bubble .vol { font-family:var(--mono); font-size:11px; color:var(--text3); margin-left:auto; }
-  .msg.bot .bubble .market-outcome { font-size:11px; color:var(--text2); margin-top:6px; font-style:italic; }
+  .msg.bot .bubble .vol { font-family:var(--mono); font-size:11px; color:var(--text2); margin-left:auto; }
+  .msg.bot .bubble .market-outcome { font-size:11px; color:var(--text2); margin-top:6px; }
   .msg.bot .bubble .change { font-family:var(--mono); font-size:11px; font-weight:500; padding:1px 6px; border-radius:4px; }
   .msg.bot .bubble .change.up   { color:var(--accent); background:var(--accent-dim); }
   .msg.bot .bubble .change.down { color:var(--red);    background:var(--red-dim); }
@@ -214,7 +216,11 @@
 
   // ── UI helpers ───────────────────────────────────────────────
   function hideWelcome() { if (welcomeEl) welcomeEl.style.display = 'none'; }
-  function scrollBottom() { messagesEl.scrollTop = messagesEl.scrollHeight; }
+
+  function scrollToEl(el) {
+    // Scroll the new message into view at the top rather than jumping to bottom
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 
   function escapeHTML(str) {
     return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -228,7 +234,7 @@
     row.className = 'msg user';
     row.innerHTML = `<div class="avatar">YOU</div><div class="bubble">${escapeHTML(text)}</div>`;
     messagesEl.appendChild(row);
-    scrollBottom();
+    scrollToEl(row);
   }
 
   function addTyping() {
@@ -238,7 +244,6 @@
     row.id = 'typing-row';
     row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
     messagesEl.appendChild(row);
-    scrollBottom();
   }
 
   function removeTyping() {
@@ -258,7 +263,8 @@
     row.appendChild(avatar);
     row.appendChild(bubble);
     messagesEl.appendChild(row);
-    scrollBottom();
+    // Scroll to top of new message, not bottom of content
+    scrollToEl(row);
     return bubble;
   }
 
@@ -267,7 +273,7 @@
     row.className = 'msg bot';
     row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="error-msg">${escapeHTML(msg)}</div></div>`;
     messagesEl.appendChild(row);
-    scrollBottom();
+    scrollToEl(row);
   }
 
   function setLoading(val) { busy = val; sendBtn.disabled = val; }
@@ -315,7 +321,7 @@
   // ── Price chart ──────────────────────────────────────────────
   async function showPriceChart(el) {
     const marketId = el.dataset.marketId;
-    const tokenId  = el.dataset.tokenId;   // Polymarket Yes outcome token ID
+    const tokenId  = el.dataset.tokenId;
     const exchange = el.dataset.exchange || 'Polymarket';
     const title    = el.closest('.market-card')?.querySelector('.market-title')?.textContent || 'Market';
     const chartId  = 'chart-' + marketId.replace(/[^a-z0-9]/gi, '_');
@@ -324,7 +330,7 @@
     const existing = document.getElementById(chartId);
     if (existing) { existing.remove(); return; }
 
-    // Insert chart card directly after the market card
+    // Insert chart card directly after the market card — no scroll
     const marketCard = el.closest('.market-card');
     const chartCard  = document.createElement('div');
     chartCard.className = 'chart-card';
@@ -344,14 +350,13 @@
       <div class="chart-stats" id="${chartId}-stats" style="display:none;"></div>
     `;
     marketCard.insertAdjacentElement('afterend', chartCard);
-    scrollBottom();
+    // No scroll — stay where the user clicked
 
     try {
       // Step 1: fetch full OMD historical daily prices (all history)
       const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
       const omdData = await omdRes.json();
 
-      // Extract Yes outcome close prices sorted by date
       const prices = (omdData || [])
         .filter(r => r.outcome === 'Yes' && r.close_price !== null)
         .sort((a, b) => a.end_period_date.localeCompare(b.end_period_date))
@@ -362,9 +367,9 @@
         return;
       }
 
-      // Step 2: fetch live price via backend proxy using token_id directly
-      // Only attempt for Polymarket markets that have a token_id
+      // Step 2: fetch live price via backend proxy using token_id
       let livePrice = null;
+      let liveTime  = null;
       let hasLive   = false;
 
       if (exchange === 'Polymarket' && tokenId) {
@@ -373,6 +378,7 @@
           const liveData = await liveRes.json();
           if (liveData.price !== null && liveData.price !== undefined) {
             livePrice = parseFloat(liveData.price);
+            liveTime  = liveData.time || null;
             hasLive   = true;
           }
         } catch (e) {
@@ -388,8 +394,11 @@
       const data = prices.map(p => Math.round(p.price * 1000) / 10);
 
       if (hasLive) {
-        const n = new Date();
-        labels.push(`${n.getMonth()+1}/${n.getDate()}/${String(n.getFullYear()).slice(2)} ▲`);
+        // Use the actual timestamp from Predexon for the label
+        const liveDate = liveTime
+          ? new Date(liveTime * 1000)
+          : new Date();
+        labels.push(`${liveDate.getMonth()+1}/${liveDate.getDate()}/${String(liveDate.getFullYear()).slice(2)} ▲`);
         data.push(Math.round(livePrice * 1000) / 10);
       }
 
@@ -450,8 +459,8 @@
               backgroundColor: '#161c24',
               borderColor: 'rgba(255,255,255,0.1)',
               borderWidth: 1,
-              titleColor: '#7d8896',
-              bodyColor: '#dde2e8',
+              titleColor: '#8a9099',
+              bodyColor: '#f0f2f5',
               titleFont: { family: "'IBM Plex Mono', monospace", size: 10 },
               bodyFont: { family: "'IBM Plex Mono', monospace", size: 12 },
               callbacks: {
@@ -467,7 +476,7 @@
             x: {
               grid: { color: 'rgba(255,255,255,0.04)' },
               ticks: {
-                color: '#3d4754',
+                color: '#8a9099',
                 font: { family: "'IBM Plex Mono', monospace", size: 9 },
                 maxTicksLimit: 10,
                 maxRotation: 0
@@ -479,7 +488,7 @@
               max: Math.min(100, Math.max(...data) + 5),
               grid: { color: 'rgba(255,255,255,0.04)' },
               ticks: {
-                color: '#3d4754',
+                color: '#8a9099',
                 font: { family: "'IBM Plex Mono', monospace", size: 9 },
                 callback: v => v + '%'
               },
@@ -526,8 +535,6 @@
           <div class="chart-stat-value" style="font-size:11px;">${hasLive ? 'Live' : 'Prior Day Close'}</div>
         </div>
       `;
-
-      scrollBottom();
 
     } catch (err) {
       document.getElementById(`${chartId}-loading`).textContent = 'Failed to load price data.';
