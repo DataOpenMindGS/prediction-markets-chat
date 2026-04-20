@@ -87,7 +87,7 @@
   .chart-card { background:var(--bg3); border:1px solid var(--border2); border-radius:10px; padding:14px; margin:8px 0; animation:fadeUp 0.2s ease; }
   .chart-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
   .chart-title { font-family:var(--mono); font-size:11px; color:var(--text2); letter-spacing:0.06em; flex:1; padding-right:10px; }
-  .chart-live-badge { font-family:var(--mono); font-size:9px; color:var(--accent); background:var(--accent-dim); border:1px solid rgba(0,229,160,0.25); padding:2px 8px; border-radius:4px; letter-spacing:0.06em; white-space:nowrap; }
+  .chart-live-badge { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:4px; letter-spacing:0.06em; white-space:nowrap; }
   .chart-close-btn { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0 4px; line-height:1; transition:color 0.15s; margin-left:8px; }
   .chart-close-btn:hover { color:var(--text); }
   .chart-wrap { position:relative; height:160px; }
@@ -174,9 +174,9 @@
 </div>
 
 <script>
-  const BACKEND_URL   = 'https://api.dataopenmind.com/public/predexon-chat';
-  const OMD_PRICES    = 'https://api.dataopenmind.com/public/get_daily_prices';
-  const LIVE_PRICE    = 'https://api.dataopenmind.com/public/get_live_price';
+  const BACKEND_URL = 'https://api.dataopenmind.com/public/predexon-chat';
+  const OMD_PRICES  = 'https://api.dataopenmind.com/public/get_daily_prices';
+  const LIVE_PRICE  = 'https://api.dataopenmind.com/public/get_live_price';
 
   const messagesEl = document.getElementById('messages');
   const welcomeEl  = document.getElementById('welcome');
@@ -315,7 +315,7 @@
   // ── Price chart ──────────────────────────────────────────────
   async function showPriceChart(el) {
     const marketId = el.dataset.marketId;
-    const slug     = el.dataset.slug;
+    const tokenId  = el.dataset.tokenId;   // Polymarket Yes outcome token ID
     const exchange = el.dataset.exchange || 'Polymarket';
     const title    = el.closest('.market-card')?.querySelector('.market-title')?.textContent || 'Market';
     const chartId  = 'chart-' + marketId.replace(/[^a-z0-9]/gi, '_');
@@ -362,13 +362,14 @@
         return;
       }
 
-      // Step 2: attempt live price via backend proxy (Polymarket only)
+      // Step 2: fetch live price via backend proxy using token_id directly
+      // Only attempt for Polymarket markets that have a token_id
       let livePrice = null;
       let hasLive   = false;
 
-      if (exchange === 'Polymarket' && slug) {
+      if (exchange === 'Polymarket' && tokenId) {
         try {
-          const liveRes  = await fetch(`${LIVE_PRICE}?slug=${encodeURIComponent(slug)}`);
+          const liveRes  = await fetch(`${LIVE_PRICE}?token_id=${encodeURIComponent(tokenId)}`);
           const liveData = await liveRes.json();
           if (liveData.price !== null && liveData.price !== undefined) {
             livePrice = parseFloat(liveData.price);
@@ -404,7 +405,6 @@
       const canvas = document.getElementById(`${chartId}-canvas`);
       canvas.style.display = 'block';
 
-      // Live point styling
       const pointColors = data.map((_, i) =>
         hasLive && i === data.length - 1 ? '#4da6ff' : 'transparent'
       );
@@ -495,12 +495,12 @@
         badge.textContent = 'LIVE';
         badge.style.color = 'var(--accent)';
         badge.style.background = 'var(--accent-dim)';
-        badge.style.borderColor = 'rgba(0,229,160,0.25)';
+        badge.style.border = '1px solid rgba(0,229,160,0.25)';
       } else {
         badge.textContent = 'EOD';
         badge.style.color = 'var(--amber)';
         badge.style.background = 'var(--amber-dim)';
-        badge.style.borderColor = 'rgba(240,165,0,0.25)';
+        badge.style.border = '1px solid rgba(240,165,0,0.25)';
       }
 
       const statsEl   = document.getElementById(`${chartId}-stats`);
