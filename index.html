@@ -141,22 +141,23 @@
 <script>
   const BACKEND_URL = 'https://api.dataopenmind.com/public/predexon-chat';
 
-  let history = [
-    {
-        role: "user",
-        content: "What is today's date and are you ready to query live market data?"
-    },
-    {
-        role: "assistant",
-        content: `Today is ${today}. I am ready to query live market data from both the OMD and Predexon APIs for all requests. I will never use training data for market prices or odds.`
-    }
-];
-  let busy    = false;
-
   const messagesEl = document.getElementById('messages');
   const welcomeEl  = document.getElementById('welcome');
   const inputEl    = document.getElementById('chat-input');
   const sendBtn    = document.getElementById('send');
+
+  const today = new Date().toLocaleDateString('en-US', {year:'numeric', month:'long', day:'numeric'});
+  let history = [
+    {
+      role: "user",
+      content: "What is today's date and are you ready to query live market data?"
+    },
+    {
+      role: "assistant",
+      content: `Today is ${today}. I am ready to query live market data from both the OMD and Predexon APIs for all requests. I will never use training data for market prices or odds.`
+    }
+  ];
+  let busy = false;
 
   inputEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
