@@ -324,6 +324,7 @@
     const tokenId  = el.dataset.tokenId;
     const exchange = el.dataset.exchange || 'Polymarket';
     const title    = el.closest('.market-card')?.querySelector('.market-title')?.textContent || 'Market';
+    const subtitle = el.closest('.market-card')?.querySelector('.market-outcome')?.textContent || '';
     const chartId  = 'chart-' + marketId.replace(/[^a-z0-9]/gi, '_');
 
     // Toggle — remove if already open
@@ -337,7 +338,10 @@
     chartCard.id = chartId;
     chartCard.innerHTML = `
       <div class="chart-header">
-        <div class="chart-title">${title.substring(0, 60)}${title.length > 60 ? '...' : ''}</div>
+        <div class="chart-title">
+          ${title.substring(0, 60)}${title.length > 60 ? '...' : ''}
+          ${subtitle ? `<div style="font-size:10px;color:var(--text3);margin-top:3px;letter-spacing:0.03em;">${subtitle}</div>` : ''}
+        </div>
         <div style="display:flex;align-items:center;gap:0;">
           <span class="chart-live-badge" id="${chartId}-badge">LOADING</span>
           <button class="chart-close-btn" onclick="document.getElementById('${chartId}').remove()">✕</button>
