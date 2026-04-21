@@ -367,13 +367,11 @@
     const conditionId = el.dataset.conditionId;
     const exchange    = el.dataset.exchange || 'Polymarket';
     const card        = el.closest('.market-card');
-    const title       = card?.querySelector('.market-title')?.textContent || 'Market';
-    const subtitle    = card?.querySelector('.market-outcome')?.textContent || '';
+    const title = card?.querySelector('.market-title')?.textContent || 'Market';
     const pid         = panelId(marketId, 'price');
 
     const opened = togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title),
-        subtitle, 'LOADING', 'var(--accent)');
+      panelShell(panel, title, 'LOADING', 'var(--accent)');
 
       try {
         const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
