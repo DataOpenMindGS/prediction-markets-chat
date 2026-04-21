@@ -503,8 +503,8 @@
 
         if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
 
-        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,10);
-        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,10);
+        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
+        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
 
         const badge = document.getElementById(`${pid}-badge`);
         badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
@@ -532,14 +532,14 @@
           data: {
             labels: allPriceLabels,
             datasets: [
-              { label:'Bids', data:bidData, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0 },
-              { label:'Asks', data:askData, backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0 }
+              { label:'Bids', data:bidData, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 },
+              { label:'Asks', data:askData, backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }
             ]
           },
           options: {
             responsive:true, maintainAspectRatio:false, animation:{duration:300},
             plugins:{
-              legend:{ display:true, labels:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:9}, boxWidth:10} },
+              legend:{ display:true, labels:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:11}, boxWidth:10} },
               tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
                 titleColor:'#8a9099', bodyColor:'#f0f2f5',
                 titleFont:{family:"'IBM Plex Mono',monospace", size:10},
@@ -548,8 +548,8 @@
               }
             },
             scales:{
-              x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:9}, maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
-              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:9}}, border:{color:'rgba(255,255,255,0.07)'} }
+              x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:11}, maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} }
+              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:11}}, border:{color:'rgba(255,255,255,0.07)'} }
             }
           }
         });
