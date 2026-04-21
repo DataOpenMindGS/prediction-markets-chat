@@ -675,7 +675,7 @@
             ? '<span class="yes">YES</span>'
             : '<span class="no">NO</span>';
           const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
-          const price = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
+          
           const amount  = fmtVol(t.amount_usd);
           const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
           const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
