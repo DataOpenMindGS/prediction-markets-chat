@@ -208,7 +208,10 @@
   const MKT_ORDERBOOK= 'https://api.dataopenmind.com/public/get_market_orderbook';
   const MKT_TRADES   = 'https://api.dataopenmind.com/public/get_market_trades';
   const MKT_OI       = 'https://api.dataopenmind.com/public/get_market_openinterest';
+  const KALSHI_TRADES    = 'https://api.dataopenmind.com/public/get_kalshi_trades';
+  const KALSHI_ORDERBOOK = 'https://api.dataopenmind.com/public/get_kalshi_orderbook';
 
+ 
   const messagesEl = document.getElementById('messages');
   const welcomeEl  = document.getElementById('welcome');
   const inputEl    = document.getElementById('chat-input');
@@ -307,6 +310,7 @@
       if (!marketId) return;
 
       const isPolymarket = exchange === 'polymarket';
+      const isKalshi = exchange === 'kalshi';
       const actions = document.createElement('div');
       actions.className = 'market-actions';
 
@@ -321,7 +325,14 @@
       if (isPolymarket && tokenId) {
         actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
       }
+      // Kalshi-only actions — extract ticker by stripping 'ka_' prefix
+      if (isKalshi && marketId) {
+        const ticker = marketId.replace(/^ka_/i, '');
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
+      }
 
+     
       card.appendChild(actions);
     });
   }
@@ -632,6 +643,198 @@
     });
   }
 
+  // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
+  async function showKalshiTradesPanel(marketId, ticker, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const pid   = panelId(marketId, 'trades');
+ 
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)');
+      try {
+        const res    = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7`);
+        const json   = await res.json();
+        const trades = (json.trades || []).slice(0, 20);
+ 
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent = `${trades.length} TRADES`;
+        badge.style.color = 'var(--text2)';
+        badge.style.background = 'var(--bg4)';
+        badge.style.border = '1px solid var(--border2)';
+ 
+        const body = document.getElementById(`${pid}-body`);
+        if (!trades.length) {
+          body.innerHTML = '<div class="panel-loading">No trades found in the last 7 days.</div>';
+          return;
+        }
+ 
+        const rows = trades.map(t => {
+          const side    = t.side === 'BUY'
+            ? '<span class="buy">BUY</span>'
+            : '<span class="sell">SELL</span>';
+          const outcome = t.is_yes_side
+            ? '<span class="yes">YES</span>'
+            : '<span class="no">NO</span>';
+          const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
+          const amount  = fmtVol(t.amount_usd);
+          const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
+          const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
+          return `<tr>
+            <td>${time}</td>
+            <td>${side}</td>
+            <td>${outcome}</td>
+            <td>${price}</td>
+            <td>${amount}</td>
+            <td style="color:var(--text3)">${contracts}</td>
+          </tr>`;
+        }).join('');
+ 
+        body.innerHTML = `
+          <div style="overflow-x:auto;margin-top:4px;">
+            <table class="trades-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Side</th>
+                  <th>Outcome</th>
+                  <th>Price</th>
+                  <th>~Amount</th>
+                  <th>Contracts</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch(e) {
+        document.getElementById(`${pid}-body`).innerHTML =
+          '<div class="panel-loading">Failed to load trades data.</div>';
+        console.error(e);
+      }
+    });
+  }
+ 
+  // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
+  async function showKalshiOrderbookPanel(marketId, ticker, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const pid   = panelId(marketId, 'orderbook');
+ 
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
+      try {
+        const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
+        const json = await res.json();
+        // Response is already normalized by proxy — bids/asks with decimal prices
+        const snap = (json.snapshots || [])[0];
+ 
+        if (!snap) {
+          document.getElementById(`${pid}-body`).innerHTML =
+            '<div class="panel-loading">No orderbook data available.</div>';
+          return;
+        }
+ 
+        const bids = (snap.bids || []).sort((a,b) => b.price - a.price).slice(0, 15);
+        const asks = (snap.asks || []).sort((a,b) => a.price - b.price).slice(0, 15);
+ 
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent = 'LIVE';
+        badge.style.color = 'var(--amber)';
+        badge.style.background = 'var(--amber-dim)';
+        badge.style.border = '1px solid rgba(240,165,0,0.25)';
+ 
+        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
+        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
+        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])]
+          .sort((a,b) => parseFloat(a) - parseFloat(b));
+ 
+        const combinedData = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
+          return bid ? bid.size : (ask ? ask.size : 0);
+        });
+        const barColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
+        });
+        const borderColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
+        });
+ 
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `
+          <div style="display:flex;gap:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+            </div>
+          </div>
+          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+          <div class="panel-stats" id="${pid}-stats"></div>`;
+ 
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type: 'bar',
+          data: {
+            labels: allPriceLabels,
+            datasets: [{
+              data: combinedData,
+              backgroundColor: barColors,
+              borderColor: borderColors,
+              borderWidth: 0,
+              barPercentage: 0.8,
+              categoryPercentage: 0.9
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                titleColor: '#8a9099', bodyColor: '#f0f2f5',
+                titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+                bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
+                callbacks: {
+                  label: (i) => {
+                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
+                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} contracts`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { offset: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+              y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 } }, border: { color: 'rgba(255,255,255,0.07)' } }
+            }
+          }
+        });
+ 
+        const bestBid = snap.best_bid ? (snap.best_bid * 100).toFixed(1) + '%' : (bids.length ? (bids[0].price * 100).toFixed(1) + '%' : 'N/A');
+        const bestAsk = snap.best_ask ? (snap.best_ask * 100).toFixed(1) + '%' : (asks.length ? (asks[0].price * 100).toFixed(1) + '%' : 'N/A');
+        const spread  = bids.length && asks.length
+          ? ((asks[0].price - bids[0].price) * 100).toFixed(1) + '%'
+          : 'N/A';
+ 
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div>
+          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div>
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp / 1000) : 'Recent'}</div></div>`;
+ 
+      } catch(e) {
+        document.getElementById(`${pid}-body`).innerHTML =
+          '<div class="panel-loading">Failed to load orderbook data.</div>';
+        console.error(e);
+      }
+    });
+  }
+
+ 
   // ── Chat send ──────────────────────────────────────
   async function send() {
     const text = inputEl.value.trim();
