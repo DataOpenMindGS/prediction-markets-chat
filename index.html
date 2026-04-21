@@ -491,7 +491,7 @@
 // ── 📖 ORDER BOOK ─────────────────────────────────
   async function showOrderbookPanel(marketId, tokenId, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'orderbook');
 
     togglePanel(card, pid, async (panel) => {
@@ -509,18 +509,23 @@
         const badge = document.getElementById(`${pid}-badge`);
         badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
 
-        // Build per-price bar data (not cumulative)
         const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
         const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
         const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
 
-        const bidData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          return bid ? bid.size : 0;
+        // Single dataset with per-bar colors — centers each bar in its slot
+        const combinedData = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
+          return bid ? bid.size : (ask ? ask.size : 0);
         });
-        const askData = allPriceLabels.map(p => {
-          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
-          return ask ? ask.size : 0;
+        const barColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
+        });
+        const borderColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
         });
 
         const body = document.getElementById(`${pid}-body`);
@@ -531,25 +536,35 @@
           type: 'bar',
           data: {
             labels: allPriceLabels,
-            datasets: [
-               { label:'Bids', data:bidData, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, barPercentage:0.5, categoryPercentage:1.0 },
-               { label:'Asks', data:askData, backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, barPercentage:0.5, categoryPercentage:1.0 }
-            ]
+            datasets: [{
+              data: combinedData,
+              backgroundColor: barColors,
+              borderColor: borderColors,
+              borderWidth: 0,
+              barPercentage: 0.8,
+              categoryPercentage: 0.9
+            }]
           },
           options: {
-            responsive:true, maintainAspectRatio:false, animation:{duration:300},
-            plugins:{
-              legend:{ display:true, labels:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:11}, boxWidth:10} },
-              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1,
-                titleColor:'#8a9099', bodyColor:'#f0f2f5',
-                titleFont:{family:"'IBM Plex Mono',monospace", size:10},
-                bodyFont:{family:"'IBM Plex Mono',monospace", size:11},
-                callbacks:{ label:(i) => ` ${i.dataset.label}: ${i.raw.toLocaleString()} shares` }
+            responsive: true, maintainAspectRatio: false, animation: {duration: 300},
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                titleColor: '#8a9099', bodyColor: '#f0f2f5',
+                titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
+                bodyFont: {family: "'IBM Plex Mono',monospace", size: 11},
+                callbacks: {
+                  label: (i) => {
+                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
+                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} shares`;
+                  }
+                }
               }
             },
-            scales:{
-              x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:11}, maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
-              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099', font:{family:"'IBM Plex Mono',monospace", size:11}}, border:{color:'rgba(255,255,255,0.07)'} }
+            scales: {
+              x: { offset: true, grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}, maxRotation: 0}, border: {color: 'rgba(255,255,255,0.07)'} },
+              y: { grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}}, border: {color: 'rgba(255,255,255,0.07)'} }
             }
           }
         });
