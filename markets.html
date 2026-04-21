@@ -723,8 +723,8 @@
         chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
           type:'bar',
           data:{ labels:allPriceLabels, datasets:[
-            { label:'Bids', data:bidData, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 },
-            { label:'Asks', data:askData, backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }
+             { label:'Bids', data:bidData, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, barPercentage:0.5, categoryPercentage:1.0 },
+             { label:'Asks', data:askData, backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, barPercentage:0.5, categoryPercentage:1.0 }
           ]},
           options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
             plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},
