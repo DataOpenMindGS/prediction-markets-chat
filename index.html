@@ -510,16 +510,16 @@
         badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
 
         // Build per-price bar data (not cumulative)
-        const bidPrices = bids.map(b => (b.price * 100).toFixed(0) + '%');
-        const askPrices = asks.map(a => (a.price * 100).toFixed(0) + '%');
+        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
+        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
         const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
 
         const bidData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(0) + '%' === p);
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
           return bid ? bid.size : 0;
         });
         const askData = allPriceLabels.map(p => {
-          const ask = asks.find(a => (a.price * 100).toFixed(0) + '%' === p);
+          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
           return ask ? ask.size : 0;
         });
 
