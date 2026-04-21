@@ -729,7 +729,19 @@
         });
 
         const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+        body.innerHTML = `
+         <div style="display:flex;gap:14px;margin-bottom:6px;">
+           <div style="display:flex;align-items:center;gap:5px;">
+             <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+             <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+           </div>
+           <div style="display:flex;align-items:center;gap:5px;">
+             <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+             <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+           </div>
+         </div>
+         <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+         <div class="panel-stats" id="${pid}-stats"></div>`;
 
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
         chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
