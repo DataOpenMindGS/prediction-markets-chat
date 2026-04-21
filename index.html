@@ -372,7 +372,7 @@
     const pid         = panelId(marketId, 'price');
 
     const opened = togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title.substring(0,60) + (title.length>60?'...':''),
+      panelShell(panel, title),
         subtitle, 'LOADING', 'var(--accent)');
 
       try {
@@ -447,7 +447,7 @@
     const pid   = panelId(marketId, 'volume');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title.substring(0,55)+(title.length>55?'...':''), '90-day trading volume', 'LOADING', 'var(--blue)');
+      panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)');
       try {
         const res  = await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
         const json = await res.json();
@@ -497,7 +497,7 @@
     const pid   = panelId(marketId, 'orderbook');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title.substring(0,55)+(title.length>55?'...':''), 'Current order book depth', 'LOADING', 'var(--amber)');
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
       try {
         const res  = await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
         const json = await res.json();
@@ -561,7 +561,7 @@
     const pid   = panelId(marketId, 'trades');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title.substring(0,55)+(title.length>55?'...':''), 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)');
+      panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)');
       try {
         const res  = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
         const json = await res.json();
