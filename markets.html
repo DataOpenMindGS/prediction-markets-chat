@@ -281,7 +281,7 @@
       // Populate country dropdown sorted by name
       const countrySelect = document.getElementById('f-country');
       countries
-        .sort((a,b) => a.country_name.localeCompare(b.country_name))
+        .sort((a,b) => b.mapped_events_count - a.mapped_events_count)
         .forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.country;
