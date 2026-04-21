@@ -420,9 +420,9 @@
             plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
               titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:12},
               callbacks:{ title:(i)=>{ const l=i[0].label; return l.includes('▲')?l.replace(' ▲','')+' · LIVE':l; }, label:(i)=>` ${i.raw.toFixed(1)}%` } } },
-            scales:{ x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:9},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
-              y:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} },
-              y2:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} } } }
+            scales:{ x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} },
+              y2:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
 
         const badge = document.getElementById(`${pid}-badge`);
@@ -472,12 +472,12 @@
             { label:'NO',  data:noVol,  backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, stack:'vol' }
           ]},
           options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
-            plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:9},boxWidth:10}},
+            plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},
               tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
                 titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
                 callbacks:{ label:(i)=>` ${i.dataset.label}: ${fmtVol(i.raw)}` } } },
-            scales:{ x:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:9},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
-              y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:9},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
+            scales:{ x:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
 
         document.getElementById(`${pid}-stats`).innerHTML = `
