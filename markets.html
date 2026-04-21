@@ -284,7 +284,7 @@
         .sort((a,b) => a.country_name.localeCompare(b.country_name))
         .forEach(c => {
           const opt = document.createElement('option');
-          opt.value = c.country_name;
+          opt.value = c.country;
           opt.textContent = `${c.country_name} (${c.mapped_events_count})`;
           countrySelect.appendChild(opt);
         });
