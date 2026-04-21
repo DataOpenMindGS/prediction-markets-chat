@@ -652,10 +652,9 @@
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)');
       try {
-        const res    = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7`);
+        const res = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
         const json   = await res.json();
-        const trades = (json.trades || []).slice(0, 20);
- 
+        const trades = (json.trades || []).filter(t => (t.amount_usd || 0) >= 1000).slice(0, 20);
         const badge = document.getElementById(`${pid}-badge`);
         badge.textContent = `${trades.length} TRADES`;
         badge.style.color = 'var(--text2)';
@@ -676,6 +675,7 @@
             ? '<span class="yes">YES</span>'
             : '<span class="no">NO</span>';
           const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
+          const price = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
           const amount  = fmtVol(t.amount_usd);
           const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
           const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
