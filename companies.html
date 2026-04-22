@@ -205,7 +205,7 @@
     try {
       const [compRes, mktRes] = await Promise.all([
         fetch(API_BASE + '/get_company_map'),
-        fetch(API_BASE + '/get_events_dashboard_data?category=Companies&is_active=1')
+        fetch(API_BASE + '/get_events_dashboard_data?category=Companies')
       ]);
       const companies = await compRes.json();
       allMarkets = await mktRes.json();
@@ -278,7 +278,7 @@
       groups[co].totalVolume += (m.event_volume || 0);
     });
 
-    const sorted = Object.entries(groups).sort(function(a,b) { return b[1].totalVolume - a[1].totalVolume; });
+    const sorted = Object.entries(groups).sort(function(a,b) { return b[1].markets.length - a[1].markets.length; });
 
     document.getElementById('results-count').textContent =
       sorted.length + ' compan' + (sorted.length!==1?'ies':'y') + ' · ' + allMarkets.length + ' markets';
