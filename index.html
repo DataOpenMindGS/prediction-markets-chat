@@ -940,7 +940,8 @@ async function showMarketsPanel(marketId, eventId, btn) {
           </table>
         </div>`;
     } catch(e) {
-      safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
+     console.error(e) 
+     safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
       console.error(e);
     }
   });
