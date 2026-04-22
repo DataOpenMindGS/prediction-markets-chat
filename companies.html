@@ -421,7 +421,6 @@
       actions.className = 'market-actions';
       actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">&#128200; Price</button>';
      if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#128193; Markets</button>';}
-     if (m.event_id || el.dataset.eventId) {const evtId = m.event_id || el.dataset.eventId;actions.innerHTML += `<button class="action-btn" onclick="showMarketsPanel('${marketId}','${evtId}',this)">🗂 Markets</button>`;}
      if(isPolymarket && conditionId) {
         actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
         actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
