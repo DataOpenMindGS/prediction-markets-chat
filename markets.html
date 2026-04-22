@@ -844,7 +844,7 @@
   // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
   async function showKalshiTradesPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'trades');
  
     togglePanel(card, pid, async (panel) => {
@@ -914,7 +914,7 @@
   // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
   async function showKalshiOrderbookPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'orderbook');
  
     togglePanel(card, pid, async (panel) => {
