@@ -458,13 +458,7 @@
       ? m.event_url.split('/').pop()
       : null;
 
-    if (isKalshi && m.top_market_id) {
-      const ticker = m.top_market_id.replace(/^ka_/i, '');
-      actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${m.top_market_id}','${ticker}',this)">🔄 Trades</button>`;
-      actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${m.top_market_id}','${ticker}',this)">📖 Order Book</button>`;
-    }
- 
-    // Build data attributes
+   // Build data attributes
     const dataAttrs = m.top_market_id
       ? `data-market-id="${m.top_market_id}"
          ${m.top_market_token_id && isPolymarket ? `data-token-id="${m.top_market_token_id}"` : ''}
@@ -508,6 +502,11 @@
       }
       if (isPolymarket && tokenId) {
         actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
+      }
+     if (isKalshi && marketId) {
+        const ticker = marketId.replace(/^ka_/i, '');
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
       }
       card.appendChild(actions);
     }
