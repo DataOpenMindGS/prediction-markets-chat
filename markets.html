@@ -643,6 +643,7 @@
           <div class="stat"><div class="stat-label">1D Change</div><div class="stat-value ${ch1d>=0?'up':'down'}">${ch1d>=0?'+':''}${ch1d.toFixed(1)}%</div></div>
           <div class="stat"><div class="stat-label">All-Time Change</div><div class="stat-value ${chAll>=0?'up':'down'}">${chAll>=0?'+':''}${chAll.toFixed(1)}%</div></div>
           <div class="stat" style="margin-left:auto;"><div class="stat-label">As of</div><div class="stat-value" style="font-size:11px;">${hasLive?'Live':'Prior Day Close'}</div></div>`;
+          console.log('looking for:', `${pid}-body`, document.getElementById(`${pid}-body`));
       } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load price data.</div>'; console.error(e); }
     });
   }
