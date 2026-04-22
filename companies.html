@@ -693,7 +693,7 @@ async function showOpenInterestPanel(marketId, conditionId, btn) {
           scales: {
             x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
             y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y2: { position: 'right', grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
+            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
           } }
       });
 
