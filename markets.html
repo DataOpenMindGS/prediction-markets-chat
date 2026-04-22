@@ -232,16 +232,15 @@
 </div>
 
 <script>
-  const API_BASE     = 'https://api.dataopenmind.com/public';
-  const OMD_PRICES   = `${API_BASE}/get_daily_prices`;
-  const LIVE_PRICE   = `${API_BASE}/get_live_price`;
-  const MKT_VOLUME   = `${API_BASE}/get_market_volume`;
-  const MKT_ORDERBOOK= `${API_BASE}/get_market_orderbook`;
-  const MKT_TRADES   = `${API_BASE}/get_market_trades`;
-  const KALSHI_TRADES    = 'https://api.dataopenmind.com/public/get_kalshi_trades';
-  const KALSHI_ORDERBOOK = 'https://api.dataopenmind.com/public/get_kalshi_orderbook';
+  const API_BASE       = 'https://api.dataopenmind.com/public';
+  const OMD_PRICES     = `${API_BASE}/get_daily_prices`;
+  const LIVE_PRICE     = `${API_BASE}/get_live_price`;
+  const MKT_VOLUME     = `${API_BASE}/get_market_volume`;
+  const MKT_ORDERBOOK  = `${API_BASE}/get_market_orderbook`;
+  const MKT_TRADES     = `${API_BASE}/get_market_trades`;
+  const KALSHI_TRADES    = `${API_BASE}/get_kalshi_trades`;
+  const KALSHI_ORDERBOOK = `${API_BASE}/get_kalshi_orderbook`;
 
- 
   let allMarkets   = [];
   let categoryMap  = [];
   let chartInstances = {};
@@ -271,6 +270,24 @@
     return 'mid';
   }
 
+  // ── Safe DOM write — no-ops if element was removed ──
+  function safeHTML(id, html) {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  }
+  function safeStyle(id, prop, val) {
+    const el = document.getElementById(id);
+    if (el) el.style[prop] = val;
+  }
+  function safeBadge(id, text, color, bg, border) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.textContent = text;
+    el.style.color = color;
+    el.style.background = bg;
+    el.style.border = border;
+  }
+
   // ── Load filter options on page load ───────────────
   async function loadFilterOptions() {
     try {
@@ -281,7 +298,6 @@
       categoryMap = await catRes.json();
       const countries = await cntRes.json();
 
-      // Populate country dropdown sorted by name
       const countrySelect = document.getElementById('f-country');
       countries
         .sort((a,b) => b.mapped_events_count - a.mapped_events_count)
@@ -292,70 +308,44 @@
           countrySelect.appendChild(opt);
         });
 
-      // Populate category dropdown
       const categories = [...new Set(categoryMap.map(c => c.category))].sort();
       const catSelect = document.getElementById('f-category');
       categories.forEach(cat => {
         const opt = document.createElement('option');
-        opt.value = cat;
-        opt.textContent = cat;
+        opt.value = cat; opt.textContent = cat;
         catSelect.appendChild(opt);
       });
-
-    } catch(e) {
-      console.error('Failed to load filter options:', e);
-    }
+    } catch(e) { console.error('Failed to load filter options:', e); }
   }
 
-  // ── Cascade subcategory when category changes ──────
+  // ── Cascade dropdowns ──────────────────────────────
   document.getElementById('f-category').addEventListener('change', function() {
     const cat = this.value;
     const subSelect = document.getElementById('f-subcategory');
     const furtherSelect = document.getElementById('f-further');
-
     subSelect.innerHTML = '<option value="">All Subcategories</option>';
     furtherSelect.innerHTML = '<option value="">All</option>';
-
     if (cat) {
-      const subs = [...new Set(
-        categoryMap.filter(c => c.category === cat).map(c => c.subcategory)
-      )].sort();
-      subs.forEach(s => {
-        const opt = document.createElement('option');
-        opt.value = s; opt.textContent = s;
-        subSelect.appendChild(opt);
-      });
+      [...new Set(categoryMap.filter(c => c.category === cat).map(c => c.subcategory))].sort()
+        .forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s; subSelect.appendChild(o); });
     }
   });
 
-  // ── Cascade further subcategory when subcategory changes ──
   document.getElementById('f-subcategory').addEventListener('change', function() {
     const cat = document.getElementById('f-category').value;
     const sub = this.value;
     const furtherSelect = document.getElementById('f-further');
-
     furtherSelect.innerHTML = '<option value="">All</option>';
-
     if (cat && sub) {
-      const furthers = [...new Set(
-        categoryMap
-          .filter(c => c.category === cat && c.subcategory === sub)
-          .map(c => c.further_subcategory)
-      )].sort();
-      furthers.forEach(f => {
-        const opt = document.createElement('option');
-        opt.value = f; opt.textContent = f;
-        furtherSelect.appendChild(opt);
-      });
+      [...new Set(categoryMap.filter(c => c.category === cat && c.subcategory === sub).map(c => c.further_subcategory))].sort()
+        .forEach(f => { const o = document.createElement('option'); o.value = f; o.textContent = f; furtherSelect.appendChild(o); });
     }
   });
 
   // ── Apply filters ───────────────────────────────────
   async function applyFilters() {
     const btn = document.getElementById('btn-apply');
-    btn.disabled = true;
-    btn.textContent = 'Loading...';
-
+    btn.disabled = true; btn.textContent = 'Loading...';
     showState('loading');
 
     const params = new URLSearchParams();
@@ -376,7 +366,6 @@
     try {
       const res  = await fetch(`${API_BASE}/get_events_dashboard_data?${params}`);
       allMarkets = await res.json();
-
       if (!Array.isArray(allMarkets) || allMarkets.length === 0) {
         showState('empty');
         document.getElementById('results-count').textContent = '0 markets found';
@@ -385,23 +374,18 @@
         sortAndRender();
         document.getElementById('sort-wrap').style.display = 'flex';
       }
-    } catch(e) {
-      showState('error');
-      console.error(e);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = 'Apply Filters';
-    }
+    } catch(e) { showState('error'); console.error(e); }
+    finally { btn.disabled = false; btn.textContent = 'Apply Filters'; }
   }
 
   // ── Reset filters ───────────────────────────────────
   function resetFilters() {
-    document.getElementById('f-country').value   = '';
-    document.getElementById('f-category').value  = '';
+    document.getElementById('f-country').value  = '';
+    document.getElementById('f-category').value = '';
     document.getElementById('f-subcategory').innerHTML = '<option value="">All Subcategories</option>';
     document.getElementById('f-further').innerHTML = '<option value="">All</option>';
-    document.getElementById('f-active').value    = '1';
-    document.getElementById('f-volume').value    = '';
+    document.getElementById('f-active').value   = '1';
+    document.getElementById('f-volume').value   = '';
     allMarkets = [];
     showState('initial');
     document.getElementById('results-count').textContent = 'Select filters and click Apply';
@@ -422,10 +406,8 @@
         default: return 0;
       }
     });
-
     document.getElementById('results-count').textContent =
       `${sorted.length} market${sorted.length !== 1 ? 's' : ''} found`;
-
     renderMarkets(sorted);
   }
 
@@ -435,30 +417,20 @@
     grid.innerHTML = '';
     grid.style.display = 'flex';
     document.getElementById('state-initial').style.display = 'none';
-
-    markets.forEach(m => {
-      const card = buildMarketCard(m);
-      grid.appendChild(card);
-    });
+    markets.forEach(m => grid.appendChild(buildMarketCard(m)));
   }
 
   function buildMarketCard(m) {
     const wrapper = document.createElement('div');
-
     const isPolymarket = (m.exchange || '').toLowerCase() === 'polymarket';
-    const isKalshi = (m.exchange || '').toLowerCase() === 'kalshi';
-    const price   = m.top_market_last_price;
-    const pClass  = probClass(price);
-    const pct     = price != null ? Math.round(price * 100) + '%' : 'N/A';
+    const isKalshi     = (m.exchange || '').toLowerCase() === 'kalshi';
+    const price    = m.top_market_last_price;
+    const pClass   = probClass(price);
+    const pct      = price != null ? Math.round(price * 100) + '%' : 'N/A';
     const subtitle = m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? m.top_market_subtitle : null;
     const titleText = m.event_title + (subtitle ? ` · ${subtitle}` : '');
+    const slug = isPolymarket && m.event_url ? m.event_url.split('/').pop() : null;
 
-    // Build slug from event_url
-    const slug = isPolymarket && m.event_url
-      ? m.event_url.split('/').pop()
-      : null;
-
-   // Build data attributes
     const dataAttrs = m.top_market_id
       ? `data-market-id="${m.top_market_id}"
          ${m.top_market_token_id && isPolymarket ? `data-token-id="${m.top_market_token_id}"` : ''}
@@ -475,19 +447,15 @@
 
     wrapper.innerHTML = `
       <div class="market-card" id="card-${m.top_market_id?.replace(/[^a-z0-9]/gi,'_')}">
-        <div class="market-title">
-          ${escapeHTML(titleText)}${probHTML}
-        </div>
+        <div class="market-title">${escapeHTML(titleText)}${probHTML}</div>
         <div class="market-meta">
           ${m.subcategory ? `<span class="tag">${escapeHTML(m.subcategory)}</span>` : ''}
-          ${m.country ? `<span class="tag">${escapeHTML(m.country)}</span>` : ''}
-          ${m.exchange ? `<span class="tag">${escapeHTML(m.exchange.toUpperCase())}</span>` : ''}
+          ${m.country     ? `<span class="tag">${escapeHTML(m.country)}</span>`     : ''}
+          ${m.exchange    ? `<span class="tag">${escapeHTML(m.exchange.toUpperCase())}</span>` : ''}
           <span class="vol">Vol: ${fmtVol(m.event_volume)}</span>
         </div>
-      </div>
-    `;
+      </div>`;
 
-    // Inject action buttons
     const card = wrapper.querySelector('.market-card');
     if (m.top_market_id) {
       const marketId    = m.top_market_id;
@@ -503,14 +471,13 @@
       if (isPolymarket && tokenId) {
         actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
       }
-     if (isKalshi && marketId) {
+      if (isKalshi && marketId) {
         const ticker = marketId.replace(/^ka_/i, '');
         actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
         actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
       }
       card.appendChild(actions);
     }
-
     return wrapper;
   }
 
@@ -520,7 +487,6 @@
     const grid    = document.getElementById('market-grid');
     grid.style.display = 'none';
     grid.innerHTML = '';
-
     if (state === 'initial') {
       initial.style.display = 'flex';
       initial.innerHTML = `<div class="state-icon">🔍</div><div class="state-title">SELECT FILTERS ABOVE</div><div class="state-sub">Choose your filters and click Apply to browse prediction markets.</div>`;
@@ -536,7 +502,7 @@
     }
   }
 
-  // ── Panel helpers (shared with chat page) ───────────
+  // ── Panel helpers ───────────────────────────────────
   function panelId(marketId, type) {
     return `panel-${type}-${marketId.replace(/[^a-z0-9]/gi,'_')}`;
   }
@@ -566,32 +532,30 @@
           <button class="panel-close" onclick="document.getElementById('${panel.id}').remove()">✕</button>
         </div>
       </div>
-      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>
-    `;
+      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>`;
   }
 
   // ── 📈 PRICE CHART ──────────────────────────────────
   async function showPriceChart(el) {
     if (!el) return;
-    const marketId    = el.dataset.marketId;
-    const tokenId     = el.dataset.tokenId;
-    const exchange    = el.dataset.exchange || 'Polymarket';
-    const card        = el.closest('.market-card');
-    const title       = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const pid         = panelId(marketId, 'price');
+    const marketId = el.dataset.marketId;
+    const tokenId  = el.dataset.tokenId;
+    const exchange = el.dataset.exchange || 'Polymarket';
+    const card     = el.closest('.market-card');
+    const title    = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const pid      = panelId(marketId, 'price');
 
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, '', 'LOADING', 'var(--accent)');
-      console.log('panel.id:', panel.id, 'pid:', pid, 'body exists:', !!document.getElementById(`${pid}-body`));
       try {
-        const omdRes = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
+        const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
         const omdData = await omdRes.json();
-        const prices = (omdData||[])
+        const prices  = (omdData||[])
           .filter(r => r.outcome==='Yes' && r.close_price!=null)
           .sort((a,b) => a.end_period_date.localeCompare(b.end_period_date))
           .map(r => ({ date:r.end_period_date, price:parseFloat(r.close_price) }));
 
-        if (!prices.length) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No price history available.</div>'; return; }
+        if (!prices.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No price history available.</div>'); return; }
 
         let livePrice=null, liveTime=null, hasLive=false;
         if (exchange==='Polymarket' && tokenId) {
@@ -613,14 +577,17 @@
         const firstP=data[0], prevP=data[hasLive?data.length-2:data.length-1], currP=data[data.length-1];
         const chAll=currP-firstP, ch1d=currP-prevP;
 
-        const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
 
         const pointColors = data.map((_,i) => hasLive&&i===data.length-1?'#4da6ff':'transparent');
         const pointRadius = data.map((_,i) => hasLive&&i===data.length-1?5:2);
 
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+        const canvasEl = document.getElementById(`${pid}-canvas`);
+        if (!canvasEl) return;
+        chartInstances[pid] = new Chart(canvasEl, {
           type:'line',
           data:{ labels, datasets:[{ data, borderColor:'#00e5a0', borderWidth:1.5,
             pointBackgroundColor:pointColors, pointBorderColor:pointColors, pointRadius, pointHoverRadius:5,
@@ -635,17 +602,15 @@
               y2:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
 
-        const badge = document.getElementById(`${pid}-badge`);
-        if (hasLive) { badge.textContent='LIVE'; badge.style.color='var(--accent)'; badge.style.background='var(--accent-dim)'; badge.style.border='1px solid rgba(0,229,160,0.25)'; }
-        else { badge.textContent='EOD'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)'; }
+        if (hasLive) { safeBadge(`${pid}-badge`, 'LIVE', 'var(--accent)', 'var(--accent-dim)', '1px solid rgba(0,229,160,0.25)'); }
+        else         { safeBadge(`${pid}-badge`, 'EOD',  'var(--amber)',  'var(--amber-dim)',  '1px solid rgba(240,165,0,0.25)'); }
 
-        document.getElementById(`${pid}-stats`).innerHTML = `
+        safeHTML(`${pid}-stats`, `
           <div class="stat"><div class="stat-label">Current</div><div class="stat-value">${currP.toFixed(1)}%</div></div>
           <div class="stat"><div class="stat-label">1D Change</div><div class="stat-value ${ch1d>=0?'up':'down'}">${ch1d>=0?'+':''}${ch1d.toFixed(1)}%</div></div>
           <div class="stat"><div class="stat-label">All-Time Change</div><div class="stat-value ${chAll>=0?'up':'down'}">${chAll>=0?'+':''}${chAll.toFixed(1)}%</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">As of</div><div class="stat-value" style="font-size:11px;">${hasLive?'Live':'Prior Day Close'}</div></div>`;
-          console.log('looking for:', `${pid}-body`, document.getElementById(`${pid}-body`));
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load price data.</div>'; console.error(e); }
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">As of</div><div class="stat-value" style="font-size:11px;">${hasLive?'Live':'Prior Day Close'}</div></div>`);
+      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load price data.</div>'); console.error(e); }
     });
   }
 
@@ -662,21 +627,23 @@
         const json = await res.json();
         const pts  = (json.data || []).sort((a,b)=>a.timestamp-b.timestamp);
 
-        if (!pts.length) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No volume data available.</div>'; return; }
+        if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No volume data available.</div>'); return; }
 
         const labels   = pts.map(p => fmtDate(p.timestamp));
         const yesVol   = pts.map(p => Math.round((p.yes_volume||0)*100)/100);
         const noVol    = pts.map(p => Math.round((p.no_volume||0)*100)/100);
         const totalVol = pts.reduce((s,p)=>(s+(p.total_volume||0)),0);
 
-        const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
 
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent='90D'; badge.style.color='var(--blue)'; badge.style.background='var(--blue-dim)'; badge.style.border='1px solid rgba(77,166,255,0.25)';
+        safeBadge(`${pid}-badge`, '90D', 'var(--blue)', 'var(--blue-dim)', '1px solid rgba(77,166,255,0.25)');
 
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+        const canvasEl = document.getElementById(`${pid}-canvas`);
+        if (!canvasEl) return;
+        chartInstances[pid] = new Chart(canvasEl, {
           type:'bar',
           data:{ labels, datasets:[
             { label:'YES', data:yesVol, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, stack:'vol' },
@@ -691,15 +658,15 @@
               y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
 
-        document.getElementById(`${pid}-stats`).innerHTML = `
+        safeHTML(`${pid}-stats`, `
           <div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">${fmtVol(totalVol)}</div></div>
           <div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">${fmtVol(yesVol.reduce((s,v)=>s+v,0))}</div></div>
-          <div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">${fmtVol(noVol.reduce((s,v)=>s+v,0))}</div></div>`;
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load volume data.</div>'; console.error(e); }
+          <div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">${fmtVol(noVol.reduce((s,v)=>s+v,0))}</div></div>`);
+      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load volume data.</div>'); console.error(e); }
     });
   }
 
-// ── 📖 ORDER BOOK ────────────────────────────────────
+  // ── 📖 ORDER BOOK ────────────────────────────────────
   async function showOrderbookPanel(marketId, tokenId, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
@@ -712,96 +679,61 @@
         const json = await res.json();
         const snap = (json.snapshots||[])[0];
 
-        if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
+        if (!snap) { safeHTML(`${pid}-body`, '<div class="panel-loading">No orderbook data available.</div>'); return; }
 
         const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
         const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
 
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
+        safeBadge(`${pid}-badge`, 'LIVE', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
 
-        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
-        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
-        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
+        const bidPrices = bids.map(b => (b.price*100).toFixed(1)+'%');
+        const askPrices = asks.map(a => (a.price*100).toFixed(1)+'%');
+        const allPriceLabels = [...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
 
         const combinedData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
+          const bid = bids.find(b=>(b.price*100).toFixed(1)+'%'===p);
+          const ask = asks.find(a=>(a.price*100).toFixed(1)+'%'===p);
           return bid ? bid.size : (ask ? ask.size : 0);
         });
-        const barColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
-        });
-        const borderColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
-        });
+        const barColors   = allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)');
+        const borderColors= allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)');
 
-        const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        bodyEl.innerHTML = `
           <div style="display:flex;gap:14px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
-            </div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span></div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span></div>
           </div>
           <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
           <div class="panel-stats" id="${pid}-stats"></div>`;
 
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
-          type: 'bar',
-          data: {
-            labels: allPriceLabels,
-            datasets: [{
-              data: combinedData,
-              backgroundColor: barColors,
-              borderColor: borderColors,
-              borderWidth: 0,
-              barPercentage: 0.8,
-              categoryPercentage: 0.9
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, animation: {duration: 300},
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-                titleColor: '#8a9099', bodyColor: '#f0f2f5',
-                titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
-                bodyFont:  {family: "'IBM Plex Mono',monospace", size: 11},
-                callbacks: {
-                  label: (i) => {
-                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
-                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} shares`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: { offset: true, grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}, maxRotation: 0}, border: {color: 'rgba(255,255,255,0.07)'} },
-              y: { grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}}, border: {color: 'rgba(255,255,255,0.07)'} }
-            }
-          }
+        const canvasEl = document.getElementById(`${pid}-canvas`);
+        if (!canvasEl) return;
+        chartInstances[pid] = new Chart(canvasEl, {
+          type:'bar',
+          data:{ labels:allPriceLabels, datasets:[{ data:combinedData, backgroundColor:barColors, borderColor:borderColors, borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{ legend:{display:false},
+              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+                titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
+                callbacks:{ label:(i)=>{ const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)'; return ` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} shares`; } } } },
+            scales:{
+              x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
 
-        const spread = asks.length && bids.length ? ((asks[0].price - bids[0].price)*100).toFixed(1) : 'N/A';
-        document.getElementById(`${pid}-stats`).innerHTML = `
+        const spread = asks.length && bids.length ? ((asks[0].price-bids[0].price)*100).toFixed(1) : 'N/A';
+        safeHTML(`${pid}-stats`, `
           <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
           <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
-          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread !== 'N/A' ? spread+'%' : 'N/A'}</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp/1000) : 'Recent'}</div></div>`;
-
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load orderbook data.</div>'; console.error(e); }
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread!=='N/A'?spread+'%':'N/A'}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`);
+      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load orderbook data.</div>'); console.error(e); }
     });
   }
- 
+
   // ── 🔄 TRADES TABLE ──────────────────────────────────
   async function showTradesPanel(marketId, conditionId, btn) {
     const card  = btn.closest('.market-card');
@@ -815,227 +747,144 @@
         const json   = await res.json();
         const trades = (json.trades || []).slice(0, 20);
 
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent=`${trades.length} TRADES`; badge.style.color='var(--text2)'; badge.style.background='var(--bg4)'; badge.style.border='1px solid var(--border2)';
+        safeBadge(`${pid}-badge`, `${trades.length} TRADES`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
 
-        const body = document.getElementById(`${pid}-body`);
-        if (!trades.length) { body.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>'; return; }
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        if (!trades.length) { bodyEl.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>'; return; }
 
         const rows = trades.map(t => {
-          const side    = t.side === 'BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
-          const outcome = t.is_yes_side ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
-          const price   = (t.price * 100).toFixed(1) + '%';
+          const side    = t.side==='BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
+          const outcome = t.is_yes_side  ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
+          const price   = (t.price*100).toFixed(1)+'%';
           const amount  = fmtVol(t.amount_usd);
           const time    = fmtTime(t.timestamp);
           const wallet  = t.user ? t.user.slice(0,6)+'...'+t.user.slice(-4) : 'N/A';
           return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${wallet}</td></tr>`;
         }).join('');
 
-        body.innerHTML = `
+        bodyEl.innerHTML = `
           <div style="overflow-x:auto;margin-top:4px;">
             <table class="trades-table">
               <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </div>`;
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load trades data.</div>'; console.error(e); }
+      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load trades data.</div>'); console.error(e); }
     });
   }
 
- 
   // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
   async function showKalshiTradesPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'trades');
- 
+
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)');
       try {
-        const res = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
+        const res    = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
         const json   = await res.json();
-        const trades = (json.trades || []).filter(t => (t.amount_usd || 0) >= 1000).slice(0, 20);
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent = `${trades.length} TRADES`;
-        badge.style.color = 'var(--text2)';
-        badge.style.background = 'var(--bg4)';
-        badge.style.border = '1px solid var(--border2)';
- 
-        const body = document.getElementById(`${pid}-body`);
-        if (!trades.length) {
-          body.innerHTML = '<div class="panel-loading">No trades found in the last 7 days.</div>';
-          return;
-        }
- 
+        const trades = (json.trades||[]).filter(t=>(t.amount_usd||0)>=1000).slice(0,20);
+
+        safeBadge(`${pid}-badge`, `${trades.length} TRADES`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
+
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        if (!trades.length) { bodyEl.innerHTML='<div class="panel-loading">No trades found in the last 7 days.</div>'; return; }
+
         const rows = trades.map(t => {
-          const side    = t.side === 'BUY'
-            ? '<span class="buy">BUY</span>'
-            : '<span class="sell">SELL</span>';
-          const outcome = t.is_yes_side
-            ? '<span class="yes">YES</span>'
-            : '<span class="no">NO</span>';
-          const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
-          
-          const amount  = fmtVol(t.amount_usd);
-          const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
-          const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
-          return `<tr>
-            <td>${time}</td>
-            <td>${side}</td>
-            <td>${outcome}</td>
-            <td>${price}</td>
-            <td>${amount}</td>
-            <td style="color:var(--text3)">${contracts}</td>
-          </tr>`;
+          const side      = t.side==='BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
+          const outcome   = t.is_yes_side  ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
+          const price     = t.price!=null ? (t.price*100).toFixed(1)+'%' : 'N/A';
+          const amount    = fmtVol(t.amount_usd);
+          const time      = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
+          const contracts = t.shares!=null ? t.shares.toLocaleString()+' cts' : 'N/A';
+          return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${contracts}</td></tr>`;
         }).join('');
- 
-        body.innerHTML = `
+
+        bodyEl.innerHTML = `
           <div style="overflow-x:auto;margin-top:4px;">
             <table class="trades-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Side</th>
-                  <th>Outcome</th>
-                  <th>Price</th>
-                  <th>~Amount</th>
-                  <th>Contracts</th>
-                </tr>
-              </thead>
+              <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>~Amount</th><th>Contracts</th></tr></thead>
               <tbody>${rows}</tbody>
             </table>
           </div>`;
-      } catch(e) {
-        document.getElementById(`${pid}-body`).innerHTML =
-          '<div class="panel-loading">Failed to load trades data.</div>';
-        console.error(e);
-      }
+      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load trades data.</div>'); console.error(e); }
     });
   }
- 
+
   // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
   async function showKalshiOrderbookPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'orderbook');
- 
+
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
       try {
         const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
         const json = await res.json();
-        // Response is already normalized by proxy — bids/asks with decimal prices
-        const snap = (json.snapshots || [])[0];
- 
-        if (!snap) {
-          document.getElementById(`${pid}-body`).innerHTML =
-            '<div class="panel-loading">No orderbook data available.</div>';
-          return;
-        }
- 
-        const bids = (snap.bids || []).sort((a,b) => b.price - a.price).slice(0, 15);
-        const asks = (snap.asks || []).sort((a,b) => a.price - b.price).slice(0, 15);
- 
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent = 'LIVE';
-        badge.style.color = 'var(--amber)';
-        badge.style.background = 'var(--amber-dim)';
-        badge.style.border = '1px solid rgba(240,165,0,0.25)';
- 
-        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
-        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
-        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])]
-          .sort((a,b) => parseFloat(a) - parseFloat(b));
- 
+        const snap = (json.snapshots||[])[0];
+
+        if (!snap) { safeHTML(`${pid}-body`, '<div class="panel-loading">No orderbook data available.</div>'); return; }
+
+        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
+        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
+
+        safeBadge(`${pid}-badge`, 'LIVE', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
+
+        const bidPrices = bids.map(b=>(b.price*100).toFixed(1)+'%');
+        const askPrices = asks.map(a=>(a.price*100).toFixed(1)+'%');
+        const allPriceLabels = [...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
+
         const combinedData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
+          const bid = bids.find(b=>(b.price*100).toFixed(1)+'%'===p);
+          const ask = asks.find(a=>(a.price*100).toFixed(1)+'%'===p);
           return bid ? bid.size : (ask ? ask.size : 0);
         });
-        const barColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
-        });
-        const borderColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
-        });
- 
-        const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `
+        const barColors   = allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)');
+        const borderColors= allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)');
+
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        bodyEl.innerHTML = `
           <div style="display:flex;gap:14px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
-            </div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span></div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span></div>
           </div>
           <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
           <div class="panel-stats" id="${pid}-stats"></div>`;
- 
+
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
-          type: 'bar',
-          data: {
-            labels: allPriceLabels,
-            datasets: [{
-              data: combinedData,
-              backgroundColor: barColors,
-              borderColor: borderColors,
-              borderWidth: 0,
-              barPercentage: 0.8,
-              categoryPercentage: 0.9
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-                titleColor: '#8a9099', bodyColor: '#f0f2f5',
-                titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
-                bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
-                callbacks: {
-                  label: (i) => {
-                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
-                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} contracts`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: { offset: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
-              y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 } }, border: { color: 'rgba(255,255,255,0.07)' } }
-            }
-          }
+        const canvasEl = document.getElementById(`${pid}-canvas`);
+        if (!canvasEl) return;
+        chartInstances[pid] = new Chart(canvasEl, {
+          type:'bar',
+          data:{ labels:allPriceLabels, datasets:[{ data:combinedData, backgroundColor:barColors, borderColor:borderColors, borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{ legend:{display:false},
+              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+                titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
+                callbacks:{ label:(i)=>{ const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)'; return ` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} contracts`; } } } },
+            scales:{
+              x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
- 
-        const bestBid = snap.best_bid ? (snap.best_bid * 100).toFixed(1) + '%' : (bids.length ? (bids[0].price * 100).toFixed(1) + '%' : 'N/A');
-        const bestAsk = snap.best_ask ? (snap.best_ask * 100).toFixed(1) + '%' : (asks.length ? (asks[0].price * 100).toFixed(1) + '%' : 'N/A');
-        const spread  = bids.length && asks.length
-          ? ((asks[0].price - bids[0].price) * 100).toFixed(1) + '%'
-          : 'N/A';
- 
-        document.getElementById(`${pid}-stats`).innerHTML = `
+
+        const bestBid = snap.best_bid ? (snap.best_bid*100).toFixed(1)+'%' : (bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A');
+        const bestAsk = snap.best_ask ? (snap.best_ask*100).toFixed(1)+'%' : (asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A');
+        const spread  = bids.length && asks.length ? ((asks[0].price-bids[0].price)*100).toFixed(1)+'%' : 'N/A';
+
+        safeHTML(`${pid}-stats`, `
           <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div>
           <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div>
           <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp / 1000) : 'Recent'}</div></div>`;
- 
-      } catch(e) {
-        document.getElementById(`${pid}-body`).innerHTML =
-          '<div class="panel-loading">Failed to load orderbook data.</div>';
-        console.error(e);
-      }
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`);
+      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load orderbook data.</div>'); console.error(e); }
     });
   }
 
- 
- 
   // ── Init ────────────────────────────────────────────
   loadFilterOptions();
 </script>
