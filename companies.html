@@ -728,14 +728,14 @@ async function showMarketsPanel(marketId, eventId, btn) {
       if (!markets.length) { bodyEl.innerHTML = '<div class="panel-loading">No markets found for this event.</div>'; return; }
 
       const rows = markets.map(m => {
-        const prob     = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
+        const prob      = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
         const probClass = m.yes_price > 0.65 ? 'color:var(--accent)' : m.yes_price < 0.40 ? 'color:var(--red)' : 'color:var(--amber)';
-        const vol      = fmtVol(m.market_volume);
-        const expires  = m.expiration_date ? m.expiration_date : 'N/A';
-        const active   = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
-        const subtitle = m.market_subtitle ? ' <span style="color:var(--text3);">· ' + escapeHTML(m.market_subtitle) + '</span>' : '';
+        const vol       = fmtVol(m.market_volume);
+        const expires   = m.expiration_date ? m.expiration_date : 'N/A';
+        const active    = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
+        const label     = m.market_subtitle ? escapeHTML(m.market_subtitle) : escapeHTML(m.market_title);
         return `<tr>
-          <td>${active} ${escapeHTML(m.market_title)}${subtitle}</td>
+          <td>${active} ${label}</td>
           <td style="font-family:var(--mono);${probClass};font-weight:500;">${prob}</td>
           <td>${vol}</td>
           <td style="color:var(--text3);">${expires}</td>
