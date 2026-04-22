@@ -238,7 +238,10 @@
   const MKT_VOLUME   = `${API_BASE}/get_market_volume`;
   const MKT_ORDERBOOK= `${API_BASE}/get_market_orderbook`;
   const MKT_TRADES   = `${API_BASE}/get_market_trades`;
+  const KALSHI_TRADES    = 'https://api.dataopenmind.com/public/get_kalshi_trades';
+  const KALSHI_ORDERBOOK = 'https://api.dataopenmind.com/public/get_kalshi_orderbook';
 
+ 
   let allMarkets   = [];
   let categoryMap  = [];
   let chartInstances = {};
@@ -443,6 +446,7 @@
     const wrapper = document.createElement('div');
 
     const isPolymarket = (m.exchange || '').toLowerCase() === 'polymarket';
+    const isKalshi = (m.exchange || '').toLowerCase() === 'kalshi';
     const price   = m.top_market_last_price;
     const pClass  = probClass(price);
     const pct     = price != null ? Math.round(price * 100) + '%' : 'N/A';
@@ -454,6 +458,12 @@
       ? m.event_url.split('/').pop()
       : null;
 
+    if (isKalshi && m.top_market_id) {
+      const ticker = m.top_market_id.replace(/^ka_/i, '');
+      actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${m.top_market_id}','${ticker}',this)">🔄 Trades</button>`;
+      actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${m.top_market_id}','${ticker}',this)">📖 Order Book</button>`;
+    }
+ 
     // Build data attributes
     const dataAttrs = m.top_market_id
       ? `data-market-id="${m.top_market_id}"
@@ -688,7 +698,7 @@
     });
   }
 
-// ── 📖 ORDER BOOK ─────────────────────────────────
+// ── 📖 ORDER BOOK ────────────────────────────────────
   async function showOrderbookPanel(marketId, tokenId, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
@@ -713,7 +723,6 @@
         const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
         const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
 
-        // Single dataset with per-bar colors — centers each bar in its slot
         const combinedData = allPriceLabels.map(p => {
           const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
           const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
@@ -730,18 +739,18 @@
 
         const body = document.getElementById(`${pid}-body`);
         body.innerHTML = `
-         <div style="display:flex;gap:14px;margin-bottom:6px;">
-           <div style="display:flex;align-items:center;gap:5px;">
-             <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
-             <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
-           </div>
-           <div style="display:flex;align-items:center;gap:5px;">
-             <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
-             <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
-           </div>
-         </div>
-         <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
-         <div class="panel-stats" id="${pid}-stats"></div>`;
+          <div style="display:flex;gap:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+            </div>
+          </div>
+          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+          <div class="panel-stats" id="${pid}-stats"></div>`;
 
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
         chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
@@ -765,7 +774,7 @@
                 backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
                 titleColor: '#8a9099', bodyColor: '#f0f2f5',
                 titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
-                bodyFont: {family: "'IBM Plex Mono',monospace", size: 11},
+                bodyFont:  {family: "'IBM Plex Mono',monospace", size: 11},
                 callbacks: {
                   label: (i) => {
                     const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
