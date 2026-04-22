@@ -240,6 +240,8 @@
   const MKT_TRADES     = `${API_BASE}/get_market_trades`;
   const KALSHI_TRADES    = `${API_BASE}/get_kalshi_trades`;
   const KALSHI_ORDERBOOK = `${API_BASE}/get_kalshi_orderbook`;
+  const MKT_OI    = `${API_BASE}/get_market_openinterest`;
+  const GET_MARKETS = `${API_BASE}/get_markets`;
 
   let allMarkets   = [];
   let categoryMap  = [];
@@ -436,6 +438,7 @@
          ${m.top_market_token_id && isPolymarket ? `data-token-id="${m.top_market_token_id}"` : ''}
          ${m.top_market_condition_id && isPolymarket ? `data-condition-id="${m.top_market_condition_id}"` : ''}
          ${slug ? `data-slug="${slug}"` : ''}
+         ${m.event_id ? `data-event-id="${m.event_id}"` : ''}
          data-exchange="${m.exchange || ''}"
          data-source="omd"
          onclick="showPriceChart(this)"`
@@ -466,6 +469,7 @@
       actions.innerHTML += `<button class="action-btn" onclick="showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'))">📈 Price</button>`;
       if (isPolymarket && conditionId) {
         actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
         actions.innerHTML += `<button class="action-btn" onclick="showTradesPanel('${marketId}','${conditionId}',this)">🔄 Trades</button>`;
       }
       if (isPolymarket && tokenId) {
@@ -476,7 +480,8 @@
         actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
         actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
       }
-      card.appendChild(actions);
+     if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#9776; Markets</button>';} 
+     card.appendChild(actions);
     }
     return wrapper;
   }
@@ -884,6 +889,111 @@
       } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load orderbook data.</div>'); console.error(e); }
     });
   }
+
+ async function showOpenInterestPanel(marketId, conditionId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+  const pid   = panelId(marketId, 'oi');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)');
+    try {
+      const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
+      const json = await res.json();
+      const pts = (json.open_interest_over_time || []).sort((a,b) => a.timestamp - b.timestamp);
+
+      if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No open interest data available.</div>'); return; }
+
+      const labels  = pts.map(p => fmtDate(p.timestamp));
+      const data = pts.map(p => Math.round((p.open_interest_usd || 0) * 100) / 100);
+      const currOI  = data[data.length - 1];
+      const prevOI  = data[0];
+      const chOI    = currOI - prevOI;
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+      safeBadge(`${pid}-badge`, '90D', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
+
+      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+      const canvasEl = document.getElementById(`${pid}-canvas`);
+      if (!canvasEl) return;
+      chartInstances[pid] = new Chart(canvasEl, {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: '#f0a500', borderWidth: 1.5,
+          pointRadius: 0, pointHoverRadius: 4, fill: true,
+          backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(240,165,0,0.15)'); g.addColorStop(1,'rgba(240,165,0,0)'); return g; },
+          tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            titleColor: '#8a9099', bodyColor: '#f0f2f5',
+            titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+            bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
+            callbacks: { label: (i) => ` ${fmtVol(i.raw)}` } } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
+          } }
+      });
+
+      safeHTML(`${pid}-stats`, `
+        <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
+        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
+        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
+        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
+    } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
+  });
+}
+
+async function showMarketsPanel(marketId, eventId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+  const pid   = panelId(marketId, 'markets');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, 'All markets for this event', 'LOADING', 'var(--text2)');
+    try {
+      const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
+      const json   = await res.json();
+      const markets = (json || []).sort((a,b) => (b.market_volume||0) - (a.market_volume||0));
+
+      safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      if (!markets.length) { bodyEl.innerHTML = '<div class="panel-loading">No markets found for this event.</div>'; return; }
+
+      const rows = markets.map(m => {
+        const prob      = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
+        const probClass = m.yes_price > 0.65 ? 'color:var(--accent)' : m.yes_price < 0.40 ? 'color:var(--red)' : 'color:var(--amber)';
+        const vol       = fmtVol(m.market_volume);
+        const expires   = m.expiration_date ? m.expiration_date : 'N/A';
+        const active    = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
+        const label     = m.market_subtitle ? escapeHTML(m.market_subtitle) : escapeHTML(m.market_title);
+        return `<tr>
+          <td>${active} ${label}</td>
+          <td style="font-family:var(--mono);${probClass};font-weight:500;">${prob}</td>
+          <td>${vol}</td>
+          <td style="color:var(--text3);">${expires}</td>
+        </tr>`;
+      }).join('');
+
+      bodyEl.innerHTML = `
+        <div style="overflow-x:auto;margin-top:4px;">
+          <table class="trades-table">
+            <thead><tr><th>Market</th><th>Yes %</th><th>Volume</th><th>Expires</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+      safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
+      console.error(e);
+    }
+  });
+} 
 
   // ── Init ────────────────────────────────────────────
   loadFilterOptions();
