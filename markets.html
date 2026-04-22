@@ -582,6 +582,7 @@
 
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, '', 'LOADING', 'var(--accent)');
+      console.log('panel.id:', panel.id, 'pid:', pid, 'body exists:', !!document.getElementById(`${pid}-body`));
       try {
         const omdRes = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
         const omdData = await omdRes.json();
