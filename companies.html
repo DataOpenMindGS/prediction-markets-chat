@@ -296,7 +296,7 @@
   function buildCompanyAccordion(companyName, group) {
     const co      = companyMap[companyName] || {};
     const ticker  = co.ticker || null;
-    const logoUrl = co.image  || null;
+    const logoUrl = group.markets[0]?.event_image_url || null;
     const markets = group.markets.sort(function(a,b) { return (b.event_volume||0)-(a.event_volume||0); });
 
     const accordion = document.createElement('div');
