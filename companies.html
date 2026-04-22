@@ -180,6 +180,7 @@
   const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
   const STOCK_PRICES   = API_BASE + '/get_stock_prices';
   const MKT_OI = API_BASE + '/get_market_openinterest';
+  const GET_MARKETS = API_BASE + '/get_markets';
 
   let allMarkets   = [];
   let companyMap   = {};
@@ -396,7 +397,7 @@
       if(m.top_market_token_id && isPolymarket) dataAttrs += ' data-token-id="' + m.top_market_token_id + '"';
       if(m.top_market_condition_id && isPolymarket) dataAttrs += ' data-condition-id="' + m.top_market_condition_id + '"';
       if(slug) dataAttrs += ' data-slug="' + slug + '"';
-      dataAttrs += ' data-exchange="' + (m.exchange||'') + '" data-source="omd" onclick="showPriceChart(this)"';
+      dataAttrs += ' data-exchange="' + (m.exchange||'') + '" data-source="omd"' + (m.event_id ? ' data-event-id="' + m.event_id + '"' : '') + ' onclick="showPriceChart(this)"';
     }
 
     const probHTML = m.top_market_id
@@ -419,6 +420,8 @@
       const actions = document.createElement('div');
       actions.className = 'market-actions';
       actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">&#128200; Price</button>';
+     if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#128193; Markets</button>';}
+     if (m.event_id || el.dataset.eventId) {const evtId = m.event_id || el.dataset.eventId;actions.innerHTML += `<button class="action-btn" onclick="showMarketsPanel('${marketId}','${evtId}',this)">🗂 Markets</button>`;}
      if(isPolymarket && conditionId) {
         actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
         actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
@@ -706,6 +709,52 @@ async function showOpenInterestPanel(marketId, conditionId, btn) {
   });
 }
 
+async function showMarketsPanel(marketId, eventId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+  const pid   = panelId(marketId, 'markets');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, 'All markets for this event', 'LOADING', 'var(--text2)');
+    try {
+      const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
+      const json   = await res.json();
+      const markets = (json || []).sort((a,b) => (b.market_volume||0) - (a.market_volume||0));
+
+      safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      if (!markets.length) { bodyEl.innerHTML = '<div class="panel-loading">No markets found for this event.</div>'; return; }
+
+      const rows = markets.map(m => {
+        const prob     = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
+        const probClass = m.yes_price > 0.65 ? 'color:var(--accent)' : m.yes_price < 0.40 ? 'color:var(--red)' : 'color:var(--amber)';
+        const vol      = fmtVol(m.market_volume);
+        const expires  = m.expiration_date ? m.expiration_date : 'N/A';
+        const active   = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
+        const subtitle = m.market_subtitle ? ' <span style="color:var(--text3);">· ' + escapeHTML(m.market_subtitle) + '</span>' : '';
+        return `<tr>
+          <td>${active} ${escapeHTML(m.market_title)}${subtitle}</td>
+          <td style="font-family:var(--mono);${probClass};font-weight:500;">${prob}</td>
+          <td>${vol}</td>
+          <td style="color:var(--text3);">${expires}</td>
+        </tr>`;
+      }).join('');
+
+      bodyEl.innerHTML = `
+        <div style="overflow-x:auto;margin-top:4px;">
+          <table class="trades-table">
+            <thead><tr><th>Market</th><th>Yes %</th><th>Volume</th><th>Expires</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+      safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
+      console.error(e);
+    }
+  });
+} 
  
   async function showStockPanel(marketId, ticker, btn) {
     const card=btn.closest('.market-card');
