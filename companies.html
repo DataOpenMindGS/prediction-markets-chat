@@ -420,7 +420,7 @@
       const actions = document.createElement('div');
       actions.className = 'market-actions';
       actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">&#128200; Price</button>';
-     if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#128193; Markets</button>';}
+     
      if(isPolymarket && conditionId) {
         actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
         actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
@@ -437,6 +437,7 @@
       if(ticker) {
         actions.innerHTML += '<button class="action-btn" onclick="showStockPanel(\'' + marketId + '\',\'' + ticker + '\',this)" style="color:var(--purple);border-color:rgba(167,139,250,0.3);">&#128201; Stock</button>';
       }
+      if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#9776; Markets</button>';}
       card.appendChild(actions);
     }
     return wrapper;
