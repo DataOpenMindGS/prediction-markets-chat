@@ -993,7 +993,8 @@ async function showMarketsPanel(marketId, eventId, btn) {
     try {
       const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
       const json   = await res.json();
-      const markets = (json || []).sort((a,b) => (b.market_volume||0) - (a.market_volume||0));
+      const arr = Array.isArray(json) ? json : (json?.markets || json?.data || json?.results || Object.values(json) || []);
+      const markets = arr.sort((a,b) => (b.market_volume||0) - (a.market_volume||0));
 
       safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
 
