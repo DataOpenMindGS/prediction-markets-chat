@@ -1,0 +1,480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Earnings Markets – Prediction Markets Data</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
+  }
+  html, body { min-height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  #app { display:flex; flex-direction:column; min-height:100vh; }
+
+  /* ── Site Nav ── */
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s,border-color 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+  .site-nav-right { display:flex; align-items:center; }
+  .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10px; color:var(--accent2); letter-spacing:0.06em; }
+  .live-dot { width:5px; height:5px; background:var(--accent); border-radius:50%; animation:livepulse 2s ease-in-out infinite; }
+  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  /* ── Page Header ── */
+  #header { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; position:sticky; top:42px; z-index:100; }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .logo-box { width:30px; height:30px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .header-title { font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0.08em; color:var(--text); }
+  .header-sub { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.06em; margin-top:1px; }
+
+  /* ── Controls bar ── */
+  #controls { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; flex-shrink:0; }
+
+  /* ── Filter tabs ── */
+  .filter-tabs { display:flex; gap:4px; }
+  .filter-tab { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; padding:5px 12px; border-radius:6px; border:1px solid var(--border2); color:var(--text3); background:var(--bg3); cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .filter-tab:hover { color:var(--text); border-color:var(--border2); }
+  .filter-tab.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.25); }
+
+  /* ── Search ── */
+  #search-wrap { flex:1; min-width:200px; }
+  #search-input { width:100%; background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:6px 12px 6px 32px; color:var(--text2); font-family:var(--mono); font-size:11px; outline:none; transition:border-color 0.15s; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' viewBox='0 0 24 24' fill='none' stroke='%238a9099' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:10px center; }
+  #search-input:focus { border-color:rgba(0,229,160,0.35); color:var(--text); }
+  #search-input::placeholder { color:var(--text3); }
+
+  /* ── Results bar ── */
+  #results-bar { display:flex; align-items:center; justify-content:space-between; padding:7px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  #results-count { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; }
+
+  /* ── Main ── */
+  #main { flex:1; padding:12px 16px; }
+
+  /* ── State boxes ── */
+  .state-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:12px; text-align:center; }
+  .state-icon { font-size:32px; opacity:0.4; }
+  .state-title { font-family:var(--mono); font-size:13px; color:var(--text2); letter-spacing:0.04em; }
+  .state-sub { font-size:12px; color:var(--text3); max-width:280px; line-height:1.6; }
+  .spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* ── Earnings table ── */
+  #earnings-table-wrap { overflow-x:auto; }
+  table { width:100%; border-collapse:collapse; }
+  thead th { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); padding:8px 12px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:84px; z-index:5; white-space:nowrap; }
+  thead th.right { text-align:right; }
+  thead th.center { text-align:center; }
+  tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
+  tbody tr:hover { background:var(--bg2); }
+  tbody td { padding:9px 12px; font-size:13px; color:var(--text2); vertical-align:middle; }
+  tbody td.right { text-align:right; }
+  tbody td.center { text-align:center; }
+
+  /* ── Logo cell ── */
+  .company-logo { width:28px; height:28px; object-fit:contain; border-radius:4px; background:var(--bg3); padding:2px; }
+  .company-logo-fallback { width:28px; height:28px; border-radius:4px; background:var(--bg3); border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:8px; color:var(--text3); }
+
+  /* ── Market title ── */
+  .market-title-cell { font-size:12px; color:var(--text); font-weight:500; line-height:1.4; max-width:340px; }
+
+  /* ── Result badge ── */
+  .result-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 8px; border-radius:4px; display:inline-block; white-space:nowrap; }
+  .result-beat     { color:var(--accent); background:var(--accent-dim); border:1px solid rgba(0,229,160,0.2); }
+  .result-miss     { color:var(--red);    background:var(--red-dim);    border:1px solid rgba(255,77,109,0.2); }
+  .result-pending  { color:var(--amber);  background:var(--amber-dim);  border:1px solid rgba(240,165,0,0.2); }
+  .result-neutral  { color:var(--text3);  background:var(--bg4);        border:1px solid var(--border2); }
+  .result-up       { color:var(--accent); background:var(--accent-dim); border:1px solid rgba(0,229,160,0.2); }
+  .result-down     { color:var(--red);    background:var(--red-dim);    border:1px solid rgba(255,77,109,0.2); }
+
+  /* ── Price cell ── */
+  .price-cell { font-family:var(--mono); font-size:13px; font-weight:500; }
+  .price-cell.high { color:var(--accent); }
+  .price-cell.low  { color:var(--red); }
+  .price-cell.mid  { color:var(--amber); }
+  .clickable-price { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; transition:opacity 0.15s; }
+  .clickable-price:hover { opacity:0.75; }
+
+  /* ── Vol cell ── */
+  .vol-cell { font-family:var(--mono); font-size:11px; color:var(--text3); }
+
+  /* ── Trade link ── */
+  .trade-link { font-family:var(--mono); font-size:10px; letter-spacing:0.05em; color:var(--accent2); text-decoration:none; padding:3px 8px; border-radius:5px; border:1px solid rgba(0,184,122,0.25); transition:all 0.15s; }
+  .trade-link:hover { color:var(--accent); border-color:rgba(0,229,160,0.4); background:var(--accent-dim); }
+
+  /* ── Date cell ── */
+  .date-cell { font-family:var(--mono); font-size:10px; color:var(--text3); white-space:nowrap; }
+
+  /* ── Modal ── */
+  #modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:300; display:none; align-items:center; justify-content:center; }
+  #modal-backdrop.open { display:flex; }
+  #modal-box { background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius); padding:20px; width:90%; max-width:760px; animation:fadeUp 0.2s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  #modal-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+  #modal-title { font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0.04em; color:var(--text); flex:1; padding-right:12px; line-height:1.5; }
+  #modal-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:16px; padding:0; line-height:1; transition:color 0.15s; }
+  #modal-close:hover { color:var(--text); }
+  #modal-chart-wrap { height:280px; position:relative; }
+  #modal-loading { display:flex; align-items:center; justify-content:center; height:280px; font-family:var(--mono); font-size:11px; color:var(--text3); letter-spacing:0.06em; gap:10px; }
+  #modal-error { display:none; align-items:center; justify-content:center; height:100px; font-family:var(--mono); font-size:11px; color:var(--red); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Site Nav -->
+  <div id="site-nav">
+    <div class="site-nav-left">
+      <div class="site-nav-logo">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+      <div class="site-nav-divider"></div>
+      <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="earnings.html" class="active">EARNINGS</a>
+        <a href="companies.html">COMPANY MARKETS</a>
+      </div>
+    </div>
+    <div class="site-nav-right"></div>
+  </div>
+
+  <!-- Page header -->
+  <div id="header">
+    <div class="header-left">
+      <div class="logo-box">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="9" width="3" height="6" rx="1" fill="#090d12"/>
+          <rect x="6" y="5" width="3" height="10" rx="1" fill="#090d12"/>
+          <rect x="11" y="1" width="3" height="14" rx="1" fill="#090d12" opacity="0.6"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">EARNINGS MARKETS</div>
+        <div class="header-sub">POLYMARKET · KALSHI · FORECASTEX</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+
+  <!-- Controls -->
+  <div id="controls">
+    <div class="filter-tabs">
+      <div class="filter-tab active" data-filter="Beat" onclick="setFilter('Beat')">BEAT / MISS</div>
+      <div class="filter-tab" data-filter="Mention" onclick="setFilter('Mention')">MENTION</div>
+      <div class="filter-tab" data-filter="Stock Reaction" onclick="setFilter('Stock Reaction')">STOCK REACTION</div>
+    </div>
+    <div id="search-wrap">
+      <input type="text" id="search-input" placeholder="Search markets..." oninput="filterTable()">
+    </div>
+  </div>
+
+  <!-- Results bar -->
+  <div id="results-bar">
+    <div id="results-count" style="color:var(--text3);">Loading...</div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+    <div class="state-box" id="state-box">
+      <div class="spinner"></div>
+      <div class="state-title">LOADING EARNINGS DATA</div>
+    </div>
+    <div id="earnings-table-wrap" style="display:none;">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:40px;"></th>
+            <th>Market</th>
+            <th class="center">Result</th>
+            <th>Date</th>
+            <th class="right">Final Price</th>
+            <th class="right">Volume</th>
+            <th class="center">Trade</th>
+          </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+      </table>
+      <div id="no-results" style="display:none;" class="state-box">
+        <div class="state-icon">📭</div>
+        <div class="state-title">NO RESULTS FOUND</div>
+        <div class="state-sub">Try adjusting your search or filter.</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Price chart modal -->
+<div id="modal-backdrop" onclick="closeModal()">
+  <div id="modal-box" onclick="event.stopPropagation()">
+    <div id="modal-header">
+      <div id="modal-title">Price History</div>
+      <button id="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modal-loading"><div class="spinner"></div>LOADING PRICE HISTORY</div>
+    <div id="modal-error">Could not load price history.</div>
+    <div id="modal-chart-wrap" style="display:none;"><canvas id="price-chart"></canvas></div>
+  </div>
+</div>
+
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+
+<script>
+  const API_BASE      = 'https://api.dataopenmind.com/public';
+  const EARNINGS_URL  = `${API_BASE}/get_earnings_dashboard_data`;
+  const PRICE_URL     = `${API_BASE}/get_daily_prices`;
+
+  let rawData      = [];
+  let filteredData = [];
+  let currentFilter = 'Beat';
+  let chartInstance = null;
+
+  // ── Helpers ──────────────────────────────────────────
+  function fmtVol(v) {
+    if (v == null || v === 0) return '$0';
+    if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+    return '$' + Math.round(v);
+  }
+
+  function resultBadge(result) {
+    if (!result || result === 'Pending') return `<span class="result-badge result-pending">PENDING</span>`;
+    const r = result.trim();
+    if (['Beat','Mentioned','Up'].includes(r)) return `<span class="result-badge result-beat">${r.toUpperCase()}</span>`;
+    if (['Miss','Not Mentioned','Down'].includes(r)) return `<span class="result-badge result-miss">${r.toUpperCase()}</span>`;
+    return `<span class="result-badge result-neutral">${r.toUpperCase()}</span>`;
+  }
+
+  function priceClass(p) {
+    if (p == null) return 'mid';
+    if (p > 0.65) return 'high';
+    if (p < 0.40) return 'low';
+    return 'mid';
+  }
+
+  // ── Filter ───────────────────────────────────────────
+  function setFilter(val) {
+    currentFilter = val;
+    document.querySelectorAll('.filter-tab').forEach(t => {
+      t.classList.toggle('active', t.dataset.filter === val);
+    });
+    processData();
+  }
+
+  function processData() {
+    const now = new Date();
+    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+
+    let data = rawData.filter(item => item.further_subcategory === currentFilter);
+
+    // Remove stale pending items
+    data = data.filter(item => {
+      const isPending = !item.result || item.result === 'Pending';
+      if (item.earnings_date) {
+        const d = new Date(item.earnings_date);
+        return !(isPending && d < twoWeeksAgo);
+      }
+      return true;
+    });
+
+    // Sort: pending first, then by date desc
+    data.sort((a, b) => {
+      const pa = !a.result || a.result === 'Pending';
+      const pb = !b.result || b.result === 'Pending';
+      if (pa && !pb) return -1;
+      if (!pa && pb) return 1;
+      const da = a.earnings_date ? new Date(a.earnings_date) : new Date('2099-12-31');
+      const db = b.earnings_date ? new Date(b.earnings_date) : new Date('2099-12-31');
+      return pa ? (da - db) : (db - da);
+    });
+
+    filteredData = data;
+    filterTable();
+  }
+
+  function filterTable() {
+    const term = document.getElementById('search-input').value.toLowerCase();
+    const display = filteredData.filter(item => {
+      const title = (currentFilter === 'Mention' ? item.market_title : item.event_title) || '';
+      return title.toLowerCase().includes(term) || ((item.result || '').toLowerCase().includes(term));
+    });
+    renderTable(display);
+  }
+
+  // ── Render ───────────────────────────────────────────
+  function renderTable(data) {
+    const tbody = document.getElementById('table-body');
+    const wrap  = document.getElementById('earnings-table-wrap');
+    const state = document.getElementById('state-box');
+    const noRes = document.getElementById('no-results');
+
+    state.style.display = 'none';
+    wrap.style.display = 'block';
+
+    document.getElementById('results-count').textContent =
+      `${data.length} market${data.length !== 1 ? 's' : ''}`;
+
+    tbody.innerHTML = '';
+    noRes.style.display = data.length === 0 ? 'flex' : 'none';
+
+    data.forEach(item => {
+      const title   = currentFilter === 'Mention' ? item.market_title : item.event_title;
+      const vol     = item.event_volume || item.market_volume || 0;
+      const price   = item.last_price;
+      const pct     = price != null ? (price * 100).toFixed(1) + '%' : 'N/A';
+      const pClass  = priceClass(price);
+      const safeTitle = (title || '').replace(/'/g, "\\'");
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <img class="company-logo" src="${item.logo || ''}"
+               onerror="this.style.display='none'"
+               alt="">
+        </td>
+        <td class="market-title-cell">${title || '—'}</td>
+        <td class="center">${resultBadge(item.result)}</td>
+        <td class="date-cell">${item.earnings_date || '—'}</td>
+        <td class="right">
+          <span class="price-cell ${pClass} ${item.market_id ? 'clickable-price' : ''}"
+            ${item.market_id ? `onclick="showPriceChart('${item.market_id}','${safeTitle}')"` : ''}>
+            ${pct}
+          </span>
+        </td>
+        <td class="right vol-cell">${fmtVol(vol)}</td>
+        <td class="center">
+          ${item.event_url ? `<a class="trade-link" href="${item.event_url}" target="_blank">TRADE →</a>` : '—'}
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // ── Price chart modal ─────────────────────────────────
+  async function showPriceChart(marketId, title) {
+    document.getElementById('modal-title').textContent = title;
+    document.getElementById('modal-backdrop').classList.add('open');
+    document.getElementById('modal-loading').style.display = 'flex';
+    document.getElementById('modal-error').style.display = 'none';
+    document.getElementById('modal-chart-wrap').style.display = 'none';
+    document.body.style.overflow = 'hidden';
+
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+
+    try {
+      const res  = await fetch(`${PRICE_URL}?days_history=-1&market_id=${marketId}`);
+      if (!res.ok) throw new Error('fetch failed');
+      const raw  = await res.json();
+      const yes  = (raw || []).filter(r => r.outcome === 'Yes' && r.close_price != null)
+                              .sort((a,b) => a.end_period_date.localeCompare(b.end_period_date));
+
+      if (!yes.length) throw new Error('no data');
+
+      const labels = yes.map(r => {
+        const d = new Date(r.end_period_date + 'T00:00:00');
+        return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+      });
+      const prices = yes.map(r => Math.round(parseFloat(r.close_price) * 1000) / 10);
+
+      document.getElementById('modal-loading').style.display = 'none';
+      document.getElementById('modal-chart-wrap').style.display = 'block';
+
+      const ctx = document.getElementById('price-chart');
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: prices,
+            borderColor: '#00e5a0',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            fill: true,
+            backgroundColor: (ctx) => {
+              const g = ctx.chart.ctx.createLinearGradient(0,0,0,240);
+              g.addColorStop(0, 'rgba(0,229,160,0.15)');
+              g.addColorStop(1, 'rgba(0,229,160,0)');
+              return g;
+            },
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+              titleColor: '#8a9099', bodyColor: '#f0f2f5',
+              titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+              bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
+              callbacks: { label: i => ` ${i.raw.toFixed(1)}%` }
+            }
+          },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y: {
+              min: Math.max(0, Math.min(...prices) - 5),
+              max: Math.min(100, Math.max(...prices) + 5),
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => v + '%' },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            }
+          }
+        }
+      });
+    } catch(e) {
+      document.getElementById('modal-loading').style.display = 'none';
+      document.getElementById('modal-error').style.display = 'flex';
+    }
+  }
+
+  function closeModal() {
+    document.getElementById('modal-backdrop').classList.remove('open');
+    document.body.style.overflow = '';
+    if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  }
+
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // ── Init ─────────────────────────────────────────────
+  async function init() {
+    try {
+      const res = await fetch(EARNINGS_URL);
+      if (!res.ok) throw new Error('Could not connect to Earnings API.');
+      rawData = await res.json();
+      processData();
+    } catch(e) {
+      document.getElementById('state-box').innerHTML = `
+        <div class="state-icon">⚠️</div>
+        <div class="state-title">ERROR LOADING DATA</div>
+        <div class="state-sub">${e.message}</div>`;
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
