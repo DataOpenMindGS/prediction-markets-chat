@@ -205,10 +205,10 @@
           <tr>
             <th style="width:40px;"></th>
             <th>Market</th>
-            <th class="center">Result</th>
-            <th>Date</th>
             <th class="right">Final Price</th>
             <th class="right">Volume</th>
+            <th>Date</th>
+            <th class="center">Result</th>
           </tr>
         </thead>
         <tbody id="table-body"></tbody>
@@ -353,15 +353,15 @@
                alt="">
         </td>
         <td class="market-title-cell">${title || '—'}</td>
-        <td class="center">${resultBadge(item.result)}</td>
-        <td class="date-cell">${item.earnings_date || '—'}</td>
         <td class="right">
           <span class="price-cell ${pClass} ${item.market_id ? 'clickable-price' : ''}"
             ${item.market_id ? `onclick="showPriceChart('${item.market_id}','${safeTitle}')"` : ''}>
             ${pct}
           </span>
         </td>
-        <td class="right vol-cell">${fmtVol(vol)}</td>`;
+        <td class="right vol-cell">${fmtVol(vol)}</td>
+        <td class="date-cell">${item.earnings_date || '—'}</td>
+        <td class="center">${resultBadge(item.result)}</td>`;
       tbody.appendChild(tr);
     });
   }
