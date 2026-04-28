@@ -76,12 +76,12 @@
   /* ── Earnings table ── */
   #earnings-table-wrap { overflow-x:auto; }
   table { width:100%; border-collapse:collapse; }
-  thead th { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); padding:8px 12px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:84px; z-index:5; white-space:nowrap; }
+  thead th { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); padding:8px 12px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:172px; z-index:5; white-space:nowrap; }
   thead th.right { text-align:right; }
   thead th.center { text-align:center; }
   tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
   tbody tr:hover { background:var(--bg2); }
-  tbody td { padding:9px 12px; font-size:13px; color:var(--text2); vertical-align:middle; }
+  tbody td { padding:9px 12px; font-size:15px; color:var(--text2); vertical-align:middle; }
   tbody td.right { text-align:right; }
   tbody td.center { text-align:center; }
 
@@ -90,10 +90,10 @@
   .company-logo-fallback { width:28px; height:28px; border-radius:4px; background:var(--bg3); border:1px solid var(--border2); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:8px; color:var(--text3); }
 
   /* ── Market title ── */
-  .market-title-cell { font-size:12px; color:var(--text); font-weight:500; line-height:1.4; max-width:340px; }
+  .market-title-cell { font-size:15px; color:var(--text); font-weight:500; line-height:1.4; max-width:340px; }
 
   /* ── Result badge ── */
-  .result-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 8px; border-radius:4px; display:inline-block; white-space:nowrap; }
+  .result-badge { font-family:var(--mono); font-size:11px; letter-spacing:0.07em; padding:3px 10px; border-radius:4px; display:inline-block; white-space:nowrap; }
   .result-beat     { color:var(--accent); background:var(--accent-dim); border:1px solid rgba(0,229,160,0.2); }
   .result-miss     { color:var(--red);    background:var(--red-dim);    border:1px solid rgba(255,77,109,0.2); }
   .result-pending  { color:var(--amber);  background:var(--amber-dim);  border:1px solid rgba(240,165,0,0.2); }
@@ -110,14 +110,14 @@
   .clickable-price:hover { opacity:0.75; }
 
   /* ── Vol cell ── */
-  .vol-cell { font-family:var(--mono); font-size:11px; color:var(--text3); }
+  .vol-cell { font-family:var(--mono); font-size:14px; color:var(--text3); }
 
   /* ── Trade link ── */
   .trade-link { font-family:var(--mono); font-size:10px; letter-spacing:0.05em; color:var(--accent2); text-decoration:none; padding:3px 8px; border-radius:5px; border:1px solid rgba(0,184,122,0.25); transition:all 0.15s; }
   .trade-link:hover { color:var(--accent); border-color:rgba(0,229,160,0.4); background:var(--accent-dim); }
 
   /* ── Date cell ── */
-  .date-cell { font-family:var(--mono); font-size:10px; color:var(--text3); white-space:nowrap; }
+  .date-cell { font-family:var(--mono); font-size:13px; color:var(--text3); white-space:nowrap; }
 
   /* ── Modal ── */
   #modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:300; display:none; align-items:center; justify-content:center; }
@@ -362,10 +362,7 @@
             ${pct}
           </span>
         </td>
-        <td class="right vol-cell">${fmtVol(vol)}</td>
-        <td class="center">
-          ${item.event_url ? `<a class="trade-link" href="${item.event_url}" target="_blank">TRADE →</a>` : '—'}
-        </td>`;
+        <td class="right vol-cell">${fmtVol(vol)}</td>`;
       tbody.appendChild(tr);
     });
   }
