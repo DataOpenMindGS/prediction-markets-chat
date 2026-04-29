@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analysis – Prediction Markets Data</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
+  }
+  html, body { min-height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  #app { display:flex; flex-direction:column; min-height:100vh; }
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s,border-color 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+  .site-nav-right { display:flex; align-items:center; }
+  #page-header { padding:48px 24px 40px; max-width:860px; margin:0 auto; animation:fadeUp 0.5s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+  .page-eyebrow { font-family:var(--mono); font-size:9px; letter-spacing:0.14em; color:var(--accent2); text-transform:uppercase; margin-bottom:10px; }
+  .page-title { font-family:var(--mono); font-size:28px; font-weight:500; letter-spacing:0.02em; color:var(--text); margin-bottom:10px; }
+  .page-sub { font-size:14px; color:var(--text2); max-width:540px; line-height:1.75; }
+  #content { max-width:860px; margin:0 auto; padding:0 24px 80px; }
+  .article-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:14px; transition:border-color 0.15s; text-decoration:none; display:block; }
+  .article-card:hover { border-color:var(--border2); }
+  .article-card-meta { display:flex; align-items:center; gap:8px; margin-bottom:12px; flex-wrap:wrap; }
+  .article-tag { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; padding:2px 8px; border-radius:4px; }
+  .article-date { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .article-card-title { font-family:var(--mono); font-size:15px; font-weight:500; letter-spacing:0.02em; color:var(--text); margin-bottom:6px; line-height:1.4; }
+  .article-card-sub { font-size:12px; color:var(--text3); margin-bottom:12px; }
+  .article-card-body { font-size:13px; color:var(--text2); line-height:1.75; margin-bottom:16px; }
+  .article-card-stats { display:flex; gap:20px; flex-wrap:wrap; padding-top:14px; border-top:1px solid var(--border); align-items:flex-end; }
+  .article-stat-label { font-family:var(--mono); font-size:9px; letter-spacing:0.08em; color:var(--text3); text-transform:uppercase; margin-bottom:3px; }
+  .article-stat-value { font-family:var(--mono); font-size:14px; font-weight:500; color:var(--accent); }
+  .read-more { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--accent2); margin-left:auto; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="site-nav">
+    <div class="site-nav-left">
+      <div class="site-nav-logo">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+      <div class="site-nav-divider"></div>
+      <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="companies.html">COMPANY MARKETS</a>
+        <a href="earnings.html">EARNINGS</a>
+        <a href="analysis.html" class="active">ANALYSIS</a>
+      </div>
+    </div>
+    <div class="site-nav-right"></div>
+  </div>
+
+  <div id="page-header">
+    <div class="page-eyebrow">RESEARCH & ANALYSIS</div>
+    <div class="page-title">Analysis</div>
+    <div class="page-sub">Data-driven research on prediction markets and their applications for institutional investors.</div>
+  </div>
+
+  <div id="content">
+
+    <a class="article-card" href="fed-analysis.html">
+      <div class="article-card-meta">
+        <span class="article-tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid rgba(77,166,255,0.2);">FEDERAL RESERVE</span>
+        <span class="article-tag" style="background:var(--accent-dim);color:var(--accent2);border:1px solid rgba(0,229,160,0.2);">ACCURACY ANALYSIS</span>
+        <span class="article-date">APRIL 2026</span>
+      </div>
+      <div class="article-card-title">Prediction Markets & Fed Policy: An Accuracy Analysis</div>
+      <div class="article-card-sub">Evidence from Federal Reserve Rate Decision Markets · May 2023 — March 2026</div>
+      <div class="article-card-body">Kalshi prediction markets correctly identified the actual FOMC decision in 23 of 24 consecutive meetings — a 95.7% directional accuracy rate. This paper analyzes the accuracy, timeliness, and investment implications of Fed rate decision prediction markets across a full policy cycle including hikes, holds, and cuts.</div>
+      <div class="article-card-stats">
+        <div>
+          <div class="article-stat-label">Meetings Analyzed</div>
+          <div class="article-stat-value">24</div>
+        </div>
+        <div>
+          <div class="article-stat-label">Decision-Day Accuracy</div>
+          <div class="article-stat-value">95.7%</div>
+        </div>
+        <div>
+          <div class="article-stat-label">Avg. Confidence at 7 Days</div>
+          <div class="article-stat-value">90.9%</div>
+        </div>
+        <div class="read-more">READ ANALYSIS →</div>
+      </div>
+    </a>
+
+  </div>
+
+  <div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+  <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+</div>
+</body>
+</html>

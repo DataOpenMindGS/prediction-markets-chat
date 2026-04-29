@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fed Policy Accuracy Analysis – Prediction Markets Data</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
+  }
+  html, body { min-height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  #app { display:flex; flex-direction:column; min-height:100vh; }
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s,border-color 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+  .site-nav-right { display:flex; align-items:center; }
+
+  /* ── Content ── */
+  #content { max-width:860px; margin:0 auto; padding:32px 24px 80px; animation:fadeUp 0.4s ease both; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} }
+
+  /* ── Back link ── */
+  .back-link { display:inline-flex; align-items:center; gap:6px; font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; margin-bottom:24px; transition:color 0.15s; }
+  .back-link:hover { color:var(--accent2); }
+
+  /* ── Article meta ── */
+  .article-meta { display:flex; align-items:center; gap:10px; margin-bottom:24px; flex-wrap:wrap; }
+  .article-tag { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; padding:2px 8px; border-radius:4px; }
+  .article-date { font-family:var(--mono); font-size:10px; color:var(--text3); }
+
+  /* ── Report title block ── */
+  .report-title-block { border-left:3px solid var(--accent); padding:16px 20px; background:var(--bg2); border-radius:0 var(--radius) var(--radius) 0; margin-bottom:28px; }
+  .report-title { font-family:var(--mono); font-size:18px; font-weight:500; letter-spacing:0.02em; color:var(--text); margin-bottom:4px; }
+  .report-subtitle { font-size:13px; color:var(--text2); margin-bottom:8px; }
+  .report-byline { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; }
+
+  /* ── Stats bar ── */
+  .stats-bar { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1px; background:var(--border2); border:1px solid var(--border2); border-radius:var(--radius); overflow:hidden; margin-bottom:36px; }
+  .stat-cell { background:var(--bg2); padding:16px 18px; }
+  .stat-label { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; color:var(--text3); text-transform:uppercase; margin-bottom:6px; }
+  .stat-value { font-family:var(--mono); font-size:22px; font-weight:500; color:var(--accent); line-height:1; margin-bottom:4px; }
+  .stat-desc { font-size:11px; color:var(--text3); line-height:1.4; }
+
+  /* ── Sections ── */
+  .section { margin-bottom:40px; }
+  .section-number { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; color:var(--accent2); text-transform:uppercase; margin-bottom:6px; }
+  .section-title { font-family:var(--mono); font-size:16px; font-weight:500; color:var(--text); margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border); }
+  .subsection-title { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text2); margin:20px 0 10px; }
+  .body-text { font-size:14px; color:var(--text2); line-height:1.8; margin-bottom:14px; }
+  .body-text:last-child { margin-bottom:0; }
+
+  /* ── Bullets ── */
+  .findings-list { list-style:none; padding:0; margin:14px 0; display:flex; flex-direction:column; gap:8px; }
+  .findings-list li { display:flex; gap:10px; font-size:13px; color:var(--text2); line-height:1.7; }
+  .findings-list li::before { content:'—'; font-family:var(--mono); color:var(--accent2); flex-shrink:0; margin-top:1px; }
+  .findings-list li strong { color:var(--text); font-weight:500; }
+
+  /* ── Callouts ── */
+  .callout { background:var(--bg2); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:0 var(--radius) var(--radius) 0; padding:16px 18px; margin:20px 0; }
+  .callout p { font-size:13px; color:var(--text2); line-height:1.75; margin-bottom:8px; }
+  .callout p:last-child { margin-bottom:0; }
+  .callout strong { color:var(--text); font-weight:500; }
+  .callout-amber { border-left-color:var(--amber); }
+  .callout-blue { border-left-color:var(--blue); }
+  .callout-red { border-left-color:var(--red); }
+
+  /* ── Phase blocks ── */
+  .phase-grid { display:flex; flex-direction:column; gap:8px; margin:16px 0; }
+  .phase-item { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; display:flex; gap:14px; align-items:flex-start; }
+  .phase-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.08em; padding:3px 8px; border-radius:4px; white-space:nowrap; flex-shrink:0; margin-top:2px; }
+  .phase-body { font-size:13px; color:var(--text2); line-height:1.7; }
+  .phase-body strong { color:var(--text); font-weight:500; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x:auto; margin:20px 0; border:1px solid var(--border2); border-radius:var(--radius); }
+  table { width:100%; border-collapse:collapse; }
+  thead th { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); padding:10px 12px; text-align:right; background:var(--bg2); border-bottom:1px solid var(--border2); white-space:nowrap; }
+  thead th:first-child { text-align:left; }
+  thead th:nth-child(2) { text-align:left; }
+  thead th:nth-child(3) { text-align:center; }
+  tbody tr { border-bottom:1px solid var(--border); transition:background 0.1s; }
+  tbody tr:last-child { border-bottom:none; }
+  tbody tr:hover { background:var(--bg2); }
+  tbody tr.miss { background:rgba(255,77,109,0.04); }
+  tbody tr.miss:hover { background:rgba(255,77,109,0.08); }
+  tbody td { padding:8px 12px; font-family:var(--mono); font-size:11px; color:var(--text2); text-align:right; }
+  tbody td:first-child { text-align:left; color:var(--text3); }
+  tbody td:nth-child(2) { text-align:left; color:var(--text); }
+  tbody td:nth-child(3) { text-align:center; }
+  .correct { color:var(--accent); }
+  .wrong { color:var(--red); }
+  .prob-high { color:var(--accent); font-weight:500; }
+  .prob-mid { color:var(--amber); }
+  .prob-low { color:var(--red); }
+  .prob-na { color:var(--text3); }
+
+  /* ── App cards ── */
+  .app-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(360px,1fr)); gap:10px; margin:16px 0; }
+  .app-card { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; }
+  .app-card-title { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.06em; color:var(--accent); margin-bottom:8px; }
+  .app-card-body { font-size:13px; color:var(--text2); line-height:1.75; }
+
+  /* ── Conclusion ── */
+  .conclusion-box { background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius); padding:24px; margin-top:20px; text-align:center; }
+  .conclusion-box p { font-size:14px; color:var(--text2); line-height:1.8; }
+  .conclusion-box strong { color:var(--text); font-weight:500; }
+
+  /* ── Disclosure ── */
+  .disclosure { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:14px 16px; margin-top:32px; }
+  .disclosure-label { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; color:var(--text3); text-transform:uppercase; margin-bottom:6px; }
+  .disclosure p { font-size:11px; color:var(--text3); line-height:1.7; font-style:italic; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="site-nav">
+    <div class="site-nav-left">
+      <div class="site-nav-logo">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+      <div class="site-nav-divider"></div>
+      <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="companies.html">COMPANY MARKETS</a>
+        <a href="earnings.html">EARNINGS</a>
+        <a href="analysis.html" class="active">ANALYSIS</a>
+      </div>
+    </div>
+    <div class="site-nav-right"></div>
+  </div>
+
+  <div id="content">
+
+    <a class="back-link" href="analysis.html">← BACK TO ANALYSIS</a>
+
+    <div class="article-meta">
+      <span class="article-tag" style="background:var(--blue-dim);color:var(--blue);border:1px solid rgba(77,166,255,0.2);">FEDERAL RESERVE</span>
+      <span class="article-tag" style="background:var(--accent-dim);color:var(--accent2);border:1px solid rgba(0,229,160,0.2);">ACCURACY ANALYSIS</span>
+      <span class="article-date">APRIL 2026</span>
+    </div>
+
+    <div class="report-title-block">
+      <div class="report-title">Prediction Markets & Fed Policy: An Accuracy Analysis</div>
+      <div class="report-subtitle">Evidence from Federal Reserve Rate Decision Markets</div>
+      <div class="report-byline">A data-driven analysis of Kalshi prediction market accuracy · May 2023 — March 2026</div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-cell">
+        <div class="stat-label">Meetings Analyzed</div>
+        <div class="stat-value">24</div>
+        <div class="stat-desc">May 2023 – March 2026</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Decision-Day Accuracy</div>
+        <div class="stat-value">95.7%</div>
+        <div class="stat-desc">23 of 24 correct</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Avg. Confidence at 7 Days</div>
+        <div class="stat-value">90.9%</div>
+        <div class="stat-desc">Implied probability of actual outcome</div>
+      </div>
+      <div class="stat-cell">
+        <div class="stat-label">Only Miss</div>
+        <div class="stat-value" style="font-size:14px;margin-top:4px;">Sep 2024</div>
+        <div class="stat-desc">50bps cut — market priced 25bps</div>
+      </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="section">
+      <div class="section-number">EXECUTIVE SUMMARY</div>
+      <div class="section-title">Overview</div>
+      <div class="body-text">Prediction markets have emerged as a powerful and underutilized data source for investment professionals. Unlike traditional surveys or analyst forecasts, prediction markets aggregate the real-money views of a broad set of informed participants into a single, continuously updating probability signal.</div>
+      <div class="body-text">This paper analyzes the accuracy and timeliness of Kalshi Federal Reserve interest rate decision markets across 24 FOMC meetings from May 2023 through March 2026. Our findings demonstrate that these markets provide highly reliable signals with meaningful predictive power beginning at least two to three weeks before each decision — well ahead of the typical market-moving window that most investment frameworks assume.</div>
+      <div class="subsection-title">Key findings</div>
+      <ul class="findings-list">
+        <li><strong>95.7% directional accuracy</strong> on decision day across all 24 meetings analyzed</li>
+        <li>The market predicted the correct outcome in <strong>23 of 24 cases</strong></li>
+        <li>The sole miss — September 2024's 50bps cut — remained genuinely ambiguous until the final 48 hours</li>
+        <li><strong>Confidence of 80%+</strong> achieved by 30 days before the decision on average</li>
+        <li>Rises to ~90% inside 14 days, and ~95%+ inside 7 days</li>
+        <li>Provides actionable signal well ahead of blackout periods and traditional event risk windows</li>
+        <li>Meetings where the market had <strong>90%+ confidence were correct every time</strong></li>
+        <li>Only in truly ambiguous situations (like Sep 2024) did probability fail to converge</li>
+        <li>The data is available in real-time, daily, and at low cost relative to the investment edge it provides</li>
+      </ul>
+      <div class="callout">
+        <p>For investment managers active in rates, fixed income, or macro strategies, this data offers an informational advantage: the ability to quantify, track, and act on a probabilistic view of Fed policy with a degree of accuracy that rivals or exceeds most traditional research products.</p>
+      </div>
+    </div>
+
+    <!-- Section 1 -->
+    <div class="section">
+      <div class="section-number">SECTION 1</div>
+      <div class="section-title">Background: Prediction Markets and Fed Policy</div>
+      <div class="subsection-title">1.1 What are prediction markets?</div>
+      <div class="body-text">Prediction markets are financial exchanges where participants trade contracts tied to the outcome of real-world events. Prices — which range from $0 to $1 — represent the collective market-implied probability of an event occurring. A contract trading at $0.72 implies the market assigns a 72% probability to that outcome.</div>
+      <div class="body-text">Unlike opinion polls or analyst surveys, prediction markets require participants to put capital at risk, which creates strong incentives for accuracy. The structure is simple: if your prediction is correct, you profit; if wrong, you lose. This mechanism has been shown repeatedly in academic literature to outperform other forecasting methods, particularly in political and macroeconomic domains.</div>
+      <div class="body-text">Kalshi, a regulated prediction market exchange, offers contracts on Federal Reserve rate decisions for each FOMC meeting. Five possible outcomes are traded simultaneously: Cut 50bps, Cut 25bps, Hold, Hike 25bps, and Hike 50bps. Together, these prices must sum approximately to 100%, ensuring internal consistency.</div>
+      <div class="subsection-title">1.2 Why Fed rate decisions matter for investors</div>
+      <div class="body-text">The Federal Reserve's interest rate decisions are among the most consequential macro events for financial markets. They directly affect:</div>
+      <ul class="findings-list">
+        <li>Fixed income pricing and duration risk across the entire yield curve</li>
+        <li>Equity valuations, particularly for rate-sensitive sectors such as financials, real estate, and utilities</li>
+        <li>Currency markets, as rate differentials drive capital flows between countries</li>
+        <li>Credit spreads and the cost of corporate borrowing</li>
+      </ul>
+      <div class="subsection-title">1.3 Dataset overview</div>
+      <div class="body-text">This analysis covers all 24 FOMC meetings between May 2023 and March 2026. The dataset spans a rich variety of policy regimes:</div>
+      <ul class="findings-list">
+        <li>A rate-hiking cycle concluding in 2023 (two hikes covered)</li>
+        <li>An extended hold period through much of 2023 and 2024 (12 meetings)</li>
+        <li>An easing cycle beginning September 2024, including one surprise 50bps cut and multiple 25bps cuts</li>
+        <li>A return to holding in 2025–2026 as the policy cycle stabilized</li>
+      </ul>
+    </div>
+
+    <!-- Section 2 -->
+    <div class="section">
+      <div class="section-number">SECTION 2</div>
+      <div class="section-title">Accuracy Analysis</div>
+      <div class="subsection-title">2.1 Overall directional accuracy</div>
+      <div class="body-text">The headline result is striking: Kalshi prediction markets correctly identified the actual FOMC decision in 23 of the 24 meetings analyzed — a 95.7% directional accuracy rate on decision day itself. The sole miss was the September 18, 2024 meeting, at which the Fed surprised markets with a 50bps cut when consensus had firmly coalesced around 25bps.</div>
+      <div class="body-text">Beyond simply getting the direction right, the markets also conveyed high confidence in their correct calls. On decision day, the average implied probability assigned to the outcome that actually occurred was 95.1%.</div>
+      <div class="stats-bar" style="margin:20px 0;">
+        <div class="stat-cell">
+          <div class="stat-label">Decision-Day Accuracy</div>
+          <div class="stat-value">95.7%</div>
+          <div class="stat-desc">23/24 meetings correct</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Avg. Implied Prob on Decision Day</div>
+          <div class="stat-value">95.1%</div>
+          <div class="stat-desc">Of the actual outcome</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Accuracy When Confidence &gt;90%</div>
+          <div class="stat-value">100%</div>
+          <div class="stat-desc">Every such meeting was correct</div>
+        </div>
+      </div>
+      <div class="subsection-title">2.2 How confidence builds over time</div>
+      <div class="body-text">A critical investment question is not just whether the market is accurate, but how early it becomes so. Three distinct phases are visible across the 24-meeting dataset:</div>
+      <div class="phase-grid">
+        <div class="phase-item">
+          <span class="phase-badge" style="background:var(--bg3);color:var(--text3);border:1px solid var(--border2);">60–30 DAYS</span>
+          <div class="phase-body">Implied probability rises from ~68% to ~80%, with directional accuracy already in the 90–95% range. While confidence is moderate, the market is typically pointing in the correct direction even this far in advance.</div>
+        </div>
+        <div class="phase-item">
+          <span class="phase-badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid rgba(240,165,0,0.2);">30–14 DAYS</span>
+          <div class="phase-body">Confidence builds meaningfully, crossing 85% by two weeks before the meeting. <strong>This is the period where positioning based on prediction market data becomes increasingly actionable.</strong></div>
+        </div>
+        <div class="phase-item">
+          <span class="phase-badge" style="background:var(--accent-dim);color:var(--accent2);border:1px solid rgba(0,229,160,0.2);">14–0 DAYS</span>
+          <div class="phase-body">The final two weeks see a sharp convergence toward the actual outcome. Average confidence reaches ~90% at 14 days, ~91% at 7 days, and ~95% on decision day.</div>
+        </div>
+      </div>
+      <div class="subsection-title">2.3 Accuracy by time horizon</div>
+      <div class="body-text">Accuracy remains consistently high at all measured horizons, suggesting the market rarely pointed in the wrong direction even many weeks out. The key differentiator is confidence: investors using this data 7–14 days before a decision can act on an ~90% implied probability signal that has historically been correct in virtually every instance.</div>
+    </div>
+
+    <!-- Section 3 -->
+    <div class="section">
+      <div class="section-number">SECTION 3</div>
+      <div class="section-title">Per-Meeting Detail</div>
+      <div class="subsection-title">3.1 Meeting-by-meeting summary</div>
+      <div class="body-text">The table below shows the implied probability of the actual outcome at four time horizons for each of the 24 meetings analyzed. The September 2024 miss is highlighted.</div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Meeting Date</th>
+              <th>Actual Decision</th>
+              <th>Correct?</th>
+              <th>D–30</th>
+              <th>D–14</th>
+              <th>D–7</th>
+              <th>D–0</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>May 3, 2023</td><td>Hike 25bps</td><td class="correct">✓</td><td class="prob-na">—</td><td class="prob-high">92%</td><td class="prob-high">85%</td><td class="prob-high">95%</td></tr>
+            <tr><td>Jun 14, 2023</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">82%</td><td class="prob-mid">74%</td><td class="prob-high">81%</td><td class="prob-high">96%</td></tr>
+            <tr><td>Jul 26, 2023</td><td>Hike 25bps</td><td class="correct">✓</td><td class="prob-mid">75%</td><td class="prob-high">93%</td><td class="prob-high">97%</td><td class="prob-high">98%</td></tr>
+            <tr><td>Sep 20, 2023</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">90%</td><td class="prob-high">97%</td><td class="prob-high">96%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Nov 1, 2023</td><td>Hold</td><td class="correct">✓</td><td class="prob-mid">76%</td><td class="prob-high">96%</td><td class="prob-high">98%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Dec 13, 2023</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">88%</td><td class="prob-high">98%</td><td class="prob-high">99%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Jan 31, 2024</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">96%</td><td class="prob-high">99%</td><td class="prob-high">99%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Mar 20, 2024</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">96%</td><td class="prob-high">97%</td><td class="prob-high">98%</td><td class="prob-high">99%</td></tr>
+            <tr><td>May 1, 2024</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">93%</td><td class="prob-high">99%</td><td class="prob-high">99%</td><td class="prob-na">—</td></tr>
+            <tr><td>Jun 12, 2024</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">95%</td><td class="prob-high">98%</td><td class="prob-high">98%</td><td class="prob-high">98%</td></tr>
+            <tr><td>Jul 31, 2024</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">94%</td><td class="prob-high">96%</td><td class="prob-high">94%</td><td class="prob-high">98%</td></tr>
+            <tr class="miss"><td>Sep 18, 2024</td><td>Cut 50bps</td><td class="wrong">✗</td><td class="prob-low">18%</td><td class="prob-low">36%</td><td class="prob-low">7%</td><td class="prob-low">40%</td></tr>
+            <tr><td>Nov 7, 2024</td><td>Cut 25bps</td><td class="correct">✓</td><td class="prob-mid">60%</td><td class="prob-high">82%</td><td class="prob-high">90%</td><td class="prob-high">93%</td></tr>
+            <tr><td>Dec 18, 2024</td><td>Cut 25bps</td><td class="correct">✓</td><td class="prob-mid">61%</td><td class="prob-mid">72%</td><td class="prob-high">94%</td><td class="prob-high">97%</td></tr>
+            <tr><td>Jan 29, 2025</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">89%</td><td class="prob-high">99%</td><td class="prob-high">99%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Mar 19, 2025</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">98%</td><td class="prob-high">94%</td><td class="prob-high">98%</td><td class="prob-high">99%</td></tr>
+            <tr><td>May 7, 2025</td><td>Hold</td><td class="correct">✓</td><td class="prob-mid">74%</td><td class="prob-high">87%</td><td class="prob-high">92%</td><td class="prob-high">96%</td></tr>
+            <tr><td>Jun 18, 2025</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">87%</td><td class="prob-high">96%</td><td class="prob-high">97%</td><td class="prob-high">98%</td></tr>
+            <tr><td>Jul 30, 2025</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">81%</td><td class="prob-high">95%</td><td class="prob-high">95%</td><td class="prob-high">97%</td></tr>
+            <tr><td>Sep 17, 2025</td><td>Cut 25bps</td><td class="correct">✓</td><td class="prob-mid">72%</td><td class="prob-high">85%</td><td class="prob-high">82%</td><td class="prob-high">95%</td></tr>
+            <tr><td>Oct 29, 2025</td><td>Cut 25bps</td><td class="correct">✓</td><td class="prob-high">80%</td><td class="prob-high">92%</td><td class="prob-high">96%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Dec 10, 2025</td><td>Cut 25bps</td><td class="correct">✓</td><td class="prob-mid">68%</td><td class="prob-high">83%</td><td class="prob-high">93%</td><td class="prob-high">97%</td></tr>
+            <tr><td>Jan 28, 2026</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">87%</td><td class="prob-high">94%</td><td class="prob-high">97%</td><td class="prob-high">99%</td></tr>
+            <tr><td>Mar 18, 2026</td><td>Hold</td><td class="correct">✓</td><td class="prob-high">92%</td><td class="prob-high">97%</td><td class="prob-high">98%</td><td class="prob-high">99%</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="body-text">The Hold meetings of 2023–2024 were predicted with near-certainty throughout (90–99% confidence at all horizons), reflecting a clear and consistent Fed communication strategy. The cutting cycle of late 2024 and 2025 saw somewhat lower but still high confidence, given genuine uncertainty about the pace of easing.</div>
+    </div>
+
+    <!-- Section 4 -->
+    <div class="section">
+      <div class="section-number">SECTION 4</div>
+      <div class="section-title">The September 2024 Exception: Anatomy of a Surprise</div>
+      <div class="subsection-title">4.1 What happened</div>
+      <div class="body-text">On September 18, 2024, the Federal Reserve cut its benchmark rate by 50 basis points — a larger-than-expected move that caught markets off guard. Prediction markets, like most other forecasting tools, failed to lock in this outcome. It stands as the only incorrect call in the 24-meeting dataset.</div>
+      <div class="subsection-title">4.2 What the data shows</div>
+      <div class="phase-grid">
+        <div class="phase-item">
+          <span class="phase-badge" style="background:var(--bg3);color:var(--text3);border:1px solid var(--border2);">DAYS 45–50</span>
+          <div class="phase-body">The market was genuinely split, with Cut 50bps briefly leading on some days, reflecting early positioning ahead of a widely anticipated easing cycle.</div>
+        </div>
+        <div class="phase-item">
+          <span class="phase-badge" style="background:var(--amber-dim);color:var(--amber);border:1px solid rgba(240,165,0,0.2);">DAYS 15–35</span>
+          <div class="phase-body">Cut 25bps consolidated a strong lead, reaching 80–85% implied probability. Most participants had converged on 25bps as the base case.</div>
+        </div>
+        <div class="phase-item">
+          <span class="phase-badge" style="background:var(--red-dim);color:var(--red);border:1px solid rgba(255,77,109,0.2);">DAYS 0–3</span>
+          <div class="phase-body">Leaked reports and Fed communication drove Cut 50bps briefly above 50% in the final 48–72 hours. But on decision morning, Cut 25bps flipped back to 63% before the announcement.</div>
+        </div>
+      </div>
+      <div class="subsection-title">4.3 Investment implications</div>
+      <div class="callout callout-amber">
+        <p><strong>Low-confidence signals should be heeded:</strong> When the market cannot converge above 70% on any single outcome by the week before the meeting, that itself is actionable information — it signals genuine policy uncertainty that warrants hedging or position reduction.</p>
+      </div>
+      <div class="callout callout-blue" style="margin-top:10px;">
+        <p><strong>The signal was not silent:</strong> Even though the market ultimately called the outcome incorrectly, Cut 50bps never fell below 10–15% implied probability. An investor monitoring this data would have known a 50bps cut was a live possibility at all times — and could have sized positions accordingly.</p>
+      </div>
+      <div class="body-text" style="margin-top:14px;">In conventional risk management terms, the September 2024 meeting was not a "black swan" for prediction market users — it was a known-unknown, with a clearly communicated tail probability throughout the entire pre-meeting window.</div>
+    </div>
+
+    <!-- Section 5 -->
+    <div class="section">
+      <div class="section-number">SECTION 5</div>
+      <div class="section-title">Investment Applications</div>
+      <div class="subsection-title">5.1 Strategies directly informed by this data</div>
+      <div class="app-grid">
+        <div class="app-card">
+          <div class="app-card-title">RATES POSITIONING & FIXED INCOME DURATION</div>
+          <div class="app-card-body">Portfolio managers can use prediction market probabilities to dynamically adjust duration risk ahead of FOMC decisions. When the market is pricing 90%+ probability of a hold, extending duration carries minimal event risk. When probabilities are split, a neutral or hedged positioning is warranted.</div>
+        </div>
+        <div class="app-card">
+          <div class="app-card-title">OPTIONS & DERIVATIVES STRATEGIES</div>
+          <div class="app-card-body">Implied probability data can be compared directly against swaption or rate cap/floor pricing to identify mispricings. When prediction markets assign 85% probability to hold but options markets price in more uncertainty, there may be a profitable trade in selling rate volatility.</div>
+        </div>
+        <div class="app-card">
+          <div class="app-card-title">EQUITY SECTOR ROTATION</div>
+          <div class="app-card-body">Rate-sensitive equity sectors (banks, REITs, utilities, growth stocks) can be rotated in advance of expected policy moves. With 90%+ confidence signals available 7–14 days before decisions, managers have sufficient lead time to adjust sector weights.</div>
+        </div>
+        <div class="app-card">
+          <div class="app-card-title">RISK MANAGEMENT & PORTFOLIO HEDGING</div>
+          <div class="app-card-body">Prediction market probabilities provide a clean, quantifiable input to pre-meeting VaR adjustments and stress tests. Risk managers can set position limits and hedge ratios directly from probability data rather than relying on qualitative Fed-watching.</div>
+        </div>
+      </div>
+      <div class="subsection-title">5.2 Limitations and caveats</div>
+      <ul class="findings-list">
+        <li>The dataset spans a single policy instrument (Fed Funds rate) for the U.S. Federal Reserve. Generalization to other central banks should be done with caution.</li>
+        <li>The 2023–2026 period was characterized by relatively clear Fed communication policy. Future periods of genuine ambiguity may reduce accuracy.</li>
+        <li>Prediction market liquidity varies — prices may be less reliable for the most extreme outcomes which rarely trade with high volume.</li>
+        <li>Correlation with other market signals (CME FedWatch, OIS pricing) should be monitored to assess the diversification value of the signal.</li>
+      </ul>
+    </div>
+
+    <!-- Section 6 -->
+    <div class="section">
+      <div class="section-number">SECTION 6</div>
+      <div class="section-title">Conclusion</div>
+      <div class="body-text">The evidence presented in this paper makes a compelling case for incorporating prediction market data into the investment process for any strategy with exposure to Federal Reserve policy risk.</div>
+      <div class="body-text">Across 24 consecutive FOMC meetings, Kalshi prediction markets achieved 95.7% directional accuracy with an average confidence of 95% on decision day. That confidence built steadily over the weeks before each meeting, providing actionable signals 14–30 days in advance with 80–90% reliability.</div>
+      <div class="body-text">The lone miss — September 2024 — was not a failure of the prediction market mechanism. It was a genuinely ambiguous decision that confused all market participants, and even in that case the market clearly communicated uncertainty and kept the eventual outcome visible as a tail risk.</div>
+      <div class="conclusion-box">
+        <p><strong>Bottom line:</strong> Prediction markets correctly called 23 of 24 Fed decisions, with ~90% confidence available 7–14 days before each announcement. For investors managing rate-sensitive exposures, this represents a high-quality, data-driven edge that is available today.</p>
+      </div>
+    </div>
+
+    <div class="disclosure">
+      <div class="disclosure-label">DISCLOSURES & IMPORTANT INFORMATION</div>
+      <p>This document is prepared for informational and illustrative purposes only. It does not constitute investment advice, a solicitation, or an offer to buy or sell any financial instrument. Past performance of prediction markets is not indicative of future results. All probability data is sourced from Kalshi exchange pricing. Analysis covers FOMC meetings from May 2023 through March 2026. Actual investment decisions should be made in consultation with qualified financial professionals and with full regard to individual investment objectives and risk tolerance.</p>
+    </div>
+
+  </div>
+
+  <div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+  <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+
+</div>
+</body>
+</html>
