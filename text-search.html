@@ -1,0 +1,1210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Text Search – Prediction Markets Data</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
+  }
+  html,body { height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  #app { display:flex; flex-direction:column; height:100vh; }
+
+  /* Header */
+  #header { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .logo-box { width:30px; height:30px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .header-title { font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0.08em; color:var(--text); }
+  .header-sub { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.06em; margin-top:1px; }
+  .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10px; color:var(--accent2); letter-spacing:0.06em; }
+  .live-dot { width:5px; height:5px; background:var(--accent); border-radius:50%; animation:livepulse 2s ease-in-out infinite; }
+  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  /* Messages */
+  #messages { flex:1; overflow-y:auto; padding:18px 16px; display:flex; flex-direction:column; gap:18px; }
+  #messages::-webkit-scrollbar { width:3px; }
+  #messages::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+
+  /* Welcome */
+  #welcome { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; gap:18px; padding:20px 16px; text-align:center; animation:fadeUp 0.4s ease; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .welcome-icon { width:52px; height:52px; background:var(--bg3); border:1px solid var(--border2); border-radius:14px; display:flex; align-items:center; justify-content:center; }
+  .welcome-title { font-family:var(--mono); font-size:14px; font-weight:500; color:var(--text); letter-spacing:0.06em; }
+  .welcome-sub { font-size:12px; color:var(--text2); max-width:300px; line-height:1.7; margin-top:6px; }
+  .suggestions { display:flex; flex-direction:column; gap:7px; width:100%; max-width:420px; }
+  .sug-btn { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:9px 13px; color:var(--text2); font-size:11px; font-family:var(--mono); cursor:pointer; text-align:left; transition:border-color 0.15s,color 0.15s,background 0.15s; line-height:1.5; }
+  .sug-btn:hover { border-color:rgba(0,229,160,0.4); color:var(--accent); background:var(--accent-dim); }
+
+  /* Message rows */
+  .msg { display:flex; gap:10px; animation:fadeUp 0.18s ease; }
+  .msg.user { flex-direction:row-reverse; }
+  .avatar { width:26px; height:26px; border-radius:6px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:9px; font-weight:500; letter-spacing:0.04em; }
+  .msg.user .avatar { background:var(--accent-dim); color:var(--accent); border:1px solid rgba(0,229,160,0.25); }
+  .msg.bot .avatar { background:var(--bg3); color:var(--text2); border:1px solid var(--border); }
+  .bubble { max-width:calc(100% - 80px); padding:10px 14px; font-size:13px; line-height:1.65; border-radius:var(--radius); }
+  .msg.user .bubble { background:var(--accent-dim); border:1px solid rgba(0,229,160,0.18); color:var(--text); border-radius:var(--radius) 3px var(--radius) var(--radius); }
+  .msg.bot .bubble { background:var(--bg2); border:1px solid var(--border); color:var(--text); border-radius:3px var(--radius) var(--radius) var(--radius); width:100%; }
+
+  /* Market card styles */
+  .msg.bot .bubble h3 { font-family:var(--mono); font-size:10px; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); margin:14px 0 8px; padding-bottom:7px; border-bottom:1px solid var(--border); }
+  .msg.bot .bubble h3:first-child { margin-top:2px; }
+  .msg.bot .bubble .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; margin:6px 0; transition:border-color 0.15s; }
+  .msg.bot .bubble .market-card:hover { border-color:var(--border2); }
+  .msg.bot .bubble .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.45; margin-bottom:8px; }
+  .msg.bot .bubble .market-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .msg.bot .bubble .prob { font-family:var(--mono); font-size:17px; font-weight:500; }
+  .msg.bot .bubble .prob.high { color:var(--accent); }
+  .msg.bot .bubble .prob.mid  { color:var(--amber); }
+  .msg.bot .bubble .prob.low  { color:var(--red); }
+  .msg.bot .bubble .clickable-prob { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; transition:opacity 0.15s; }
+  .msg.bot .bubble .clickable-prob:hover { opacity:0.75; }
+  .msg.bot .bubble .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); }
+  .msg.bot .bubble .vol { font-family:var(--mono); font-size:11px; color:var(--text2); margin-left:auto; }
+  .msg.bot .bubble .market-outcome { font-size:11px; color:var(--text2); margin-top:6px; }
+  .msg.bot .bubble .change { font-family:var(--mono); font-size:11px; font-weight:500; padding:1px 6px; border-radius:4px; }
+  .msg.bot .bubble .change.up   { color:var(--accent); background:var(--accent-dim); }
+  .msg.bot .bubble .change.down { color:var(--red);    background:var(--red-dim); }
+  .msg.bot .bubble p { font-size:13px; color:var(--text2); line-height:1.65; margin:6px 0; }
+  .msg.bot .bubble strong { color:var(--text); font-weight:500; }
+  .msg.bot .bubble .highlight { color:var(--accent); font-family:var(--mono); }
+  .msg.bot .bubble ul { list-style:none; padding:0; margin:8px 0; }
+  .msg.bot .bubble li { font-size:13px; color:var(--text2); padding:3px 0 3px 14px; position:relative; }
+  .msg.bot .bubble li::before { content:'›'; position:absolute; left:0; color:var(--accent); font-weight:500; }
+  .error-msg { font-size:12px; color:var(--red); font-family:var(--mono); padding:8px 12px; background:var(--red-dim); border:1px solid rgba(255,77,109,0.2); border-radius:6px; }
+
+  /* Market action icons */
+  .market-actions { display:flex; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); }
+  .action-btn {
+    background:var(--bg4); border:1px solid var(--border);
+    border-radius:6px; padding:3px 9px;
+    font-size:11px; color:var(--text2);
+    cursor:pointer; transition:all 0.15s;
+    font-family:var(--mono); letter-spacing:0.02em;
+  }
+  .action-btn:hover { border-color:rgba(0,229,160,0.4); color:var(--accent); background:var(--accent-dim); }
+  .action-btn.active { border-color:rgba(0,229,160,0.5); color:var(--accent); background:var(--accent-dim); }
+
+  /* Panel (shared for all chart/data panels) */
+  .market-panel {
+    background:var(--bg3); border:1px solid var(--border2);
+    border-radius:10px; padding:14px; margin:6px 0;
+    animation:fadeUp 0.2s ease;
+  }
+  .panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+  .panel-title { font-family:var(--mono); font-size:11px; color:var(--text2); letter-spacing:0.06em; flex:1; }
+  .panel-title-sub { font-size:10px; color:var(--text3); margin-top:2px; letter-spacing:0.03em; }
+  .panel-badge { font-family:var(--mono); font-size:9px; padding:2px 8px; border-radius:4px; letter-spacing:0.06em; white-space:nowrap; }
+  .panel-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0 4px; line-height:1; transition:color 0.15s; margin-left:8px; }
+  .panel-close:hover { color:var(--text); }
+  .panel-wrap { position:relative; height:160px; }
+  .panel-loading { display:flex; align-items:center; justify-content:center; height:100px; font-family:var(--mono); font-size:11px; color:var(--text3); letter-spacing:0.06em; }
+  .panel-stats { display:flex; gap:16px; margin-top:10px; padding-top:10px; border-top:1px solid var(--border); flex-wrap:wrap; }
+  .stat { display:flex; flex-direction:column; gap:2px; }
+  .stat-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.06em; text-transform:uppercase; }
+  .stat-value { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text); }
+  .stat-value.up   { color:var(--accent); }
+  .stat-value.down { color:var(--red); }
+
+  /* Trades table */
+  .trades-table { width:100%; border-collapse:collapse; margin-top:4px; }
+  .trades-table th { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; padding:4px 8px; text-align:left; border-bottom:1px solid var(--border); }
+  .trades-table td { font-family:var(--mono); font-size:11px; color:var(--text2); padding:5px 8px; border-bottom:1px solid var(--border); }
+  .trades-table tr:last-child td { border-bottom:none; }
+  .trades-table .buy  { color:var(--accent); }
+  .trades-table .sell { color:var(--red); }
+  .trades-table .yes  { color:var(--accent); }
+  .trades-table .no   { color:var(--red); }
+
+  /* Typing */
+  .typing { display:flex; gap:4px; align-items:center; padding:4px 2px; }
+  .typing span { width:5px; height:5px; background:var(--text3); border-radius:50%; animation:bounce 1.1s infinite; }
+  .typing span:nth-child(2) { animation-delay:0.18s; }
+  .typing span:nth-child(3) { animation-delay:0.36s; }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0);opacity:0.4} 30%{transform:translateY(-5px);opacity:1} }
+
+  /* Input */
+  #input-area { padding:12px 16px 14px; background:var(--bg2); border-top:1px solid var(--border); flex-shrink:0; }
+  #input-wrap { display:flex; align-items:flex-end; gap:8px; background:var(--bg3); border:1px solid var(--border2); border-radius:var(--radius); padding:8px 8px 8px 14px; transition:border-color 0.15s; }
+  #input-wrap:focus-within { border-color:rgba(0,229,160,0.35); }
+  #chat-input { flex:1; background:transparent; border:none; outline:none; color:var(--text); font-family:var(--sans); font-size:13px; resize:none; min-height:20px; max-height:100px; line-height:1.55; padding:2px 0; }
+  #chat-input::placeholder { color:var(--text3); }
+  #send { width:32px; height:32px; background:var(--accent); border:none; border-radius:7px; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0; transition:background 0.15s,transform 0.1s; }
+  #send:hover:not(:disabled) { background:var(--accent2); }
+  #send:active:not(:disabled) { transform:scale(0.94); }
+  #send:disabled { background:var(--bg4); cursor:not-allowed; }
+  #footer { margin-top:8px; text-align:center; font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; }
+
+  /* ── Site Nav ── */
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s,border-color 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+  .site-nav-right { display:flex; align-items:center; }
+
+/* ── Text search overrides ── */
+#app { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+#search-bar {
+  background:var(--bg2); border-bottom:1px solid var(--border);
+  padding:12px 16px; flex-shrink:0; display:flex; gap:8px; align-items:center;
+}
+#search-input {
+  flex:1; background:var(--bg3); border:1px solid var(--border2);
+  border-radius:8px; padding:8px 14px; color:var(--text);
+  font-family:var(--sans); font-size:14px; outline:none;
+  transition:border-color 0.15s;
+}
+#search-input:focus { border-color:rgba(0,229,160,0.4); }
+#search-input::placeholder { color:var(--text3); }
+#search-btn {
+  background:var(--accent); border:none; border-radius:8px;
+  padding:8px 18px; color:#090d12; font-family:var(--mono);
+  font-size:11px; font-weight:500; letter-spacing:0.06em;
+  cursor:pointer; transition:background 0.15s; white-space:nowrap; flex-shrink:0;
+}
+#search-btn:hover:not(:disabled) { background:var(--accent2); }
+#search-btn:disabled { background:var(--bg4); color:var(--text3); cursor:not-allowed; }
+
+#filter-row {
+  display:flex; align-items:center; gap:10px; padding:8px 16px;
+  background:var(--bg2); border-bottom:1px solid var(--border);
+  flex-shrink:0; flex-wrap:wrap;
+}
+.filter-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
+.filter-toggle {
+  font-family:var(--mono); font-size:10px; letter-spacing:0.06em;
+  padding:3px 10px; border-radius:5px; border:1px solid var(--border2);
+  color:var(--text3); background:var(--bg3); cursor:pointer; transition:all 0.15s;
+}
+.filter-toggle.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.25); }
+.filter-toggle:hover { color:var(--text); }
+
+#results-bar {
+  display:none; align-items:center; justify-content:space-between;
+  padding:7px 16px; border-bottom:1px solid var(--border); flex-shrink:0;
+}
+#results-count { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; }
+#sort-wrap { display:flex; align-items:center; gap:6px; }
+#sort-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
+#sort-select {
+  background:var(--bg3); border:1px solid var(--border); border-radius:6px;
+  padding:3px 22px 3px 8px; color:var(--text2); font-family:var(--mono); font-size:10px;
+  cursor:pointer; appearance:none; -webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a9099' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat; background-position:right 6px center; outline:none;
+}
+#sort-select:focus { border-color:rgba(0,229,160,0.35); }
+
+#main { flex:1; overflow-y:auto; padding:12px 16px; }
+
+.state-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:12px; text-align:center; }
+.state-icon { font-size:32px; opacity:0.4; }
+.state-title { font-family:var(--mono); font-size:13px; color:var(--text2); letter-spacing:0.04em; }
+.state-sub { font-size:12px; color:var(--text3); max-width:300px; line-height:1.6; }
+.spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+
+#market-grid { display:flex; flex-direction:column; gap:8px; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="site-nav">
+    <div class="site-nav-left">
+      <div class="site-nav-logo">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+      <div class="site-nav-divider"></div>
+      <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="text-search.html" class="active">TEXT SEARCH</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="companies.html">COMPANY MARKETS</a>
+        <a href="earnings.html">EARNINGS</a>
+        <a href="analysis.html">ANALYSIS</a>
+      </div>
+    </div>
+    <div class="site-nav-right"></div>
+  </div>
+
+  <div id="header">
+    <div class="header-left">
+      <div class="logo-box">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <circle cx="6" cy="6" r="4.5" stroke="#090d12" stroke-width="1.6"/>
+          <line x1="9.5" y1="9.5" x2="14" y2="14" stroke="#090d12" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">TEXT SEARCH</div>
+        <div class="header-sub">SEARCH ACROSS ALL PREDICTION MARKET EVENTS</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+
+  <div id="search-bar">
+    <input type="text" id="search-input"
+      placeholder='Search markets — e.g. "interest rate", "bitcoin halving", "Apple earnings"...'
+      autocomplete="off">
+    <button id="search-btn" onclick="doSearch()">SEARCH</button>
+  </div>
+
+  <div id="filter-row">
+    <span class="filter-label">Show:</span>
+    <button class="filter-toggle active" id="toggle-active" onclick="toggleFilter('active')">Active Only</button>
+    <button class="filter-toggle" id="toggle-all"    onclick="toggleFilter('all')">All Markets</button>
+  </div>
+
+  <div id="results-bar">
+    <div id="results-count"></div>
+    <div id="sort-wrap">
+      <div id="sort-label">Sort by</div>
+      <select id="sort-select" onchange="sortAndRender()">
+        <option value="volume_desc">Volume ↓</option>
+        <option value="volume_asc">Volume ↑</option>
+        <option value="prob_desc">Probability ↓</option>
+        <option value="prob_asc">Probability ↑</option>
+        <option value="title_asc">Title A–Z</option>
+      </select>
+    </div>
+  </div>
+
+  <div id="main">
+    <div class="state-box" id="state-box">
+      <div class="state-icon">🔍</div>
+      <div class="state-title">SEARCH PREDICTION MARKETS</div>
+      <div class="state-sub">Type any keyword or phrase to search across all market titles, descriptions, companies, and categories.</div>
+    </div>
+    <div id="market-grid" style="display:none;"></div>
+  </div>
+
+</div>
+
+<script>
+  const API_BASE         = 'https://api.dataopenmind.com/public';
+  const SEARCH_URL       = API_BASE + '/search_events';
+  const DASHBOARD_URL    = API_BASE + '/get_events_dashboard_data';
+  const OMD_PRICES       = API_BASE + '/get_daily_prices';
+  const LIVE_PRICE       = API_BASE + '/get_live_price';
+  const MKT_VOLUME       = API_BASE + '/get_market_volume';
+  const MKT_ORDERBOOK    = API_BASE + '/get_market_orderbook';
+  const MKT_TRADES       = API_BASE + '/get_market_trades';
+  const MKT_OI           = API_BASE + '/get_market_openinterest';
+  const KALSHI_TRADES    = API_BASE + '/get_kalshi_trades';
+  const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
+  const GET_MARKETS      = API_BASE + '/get_markets';
+
+  let allMarkets     = [];
+  let chartInstances = {};
+  let activeFilter   = 'active';
+
+  function toggleFilter(val) {
+    activeFilter = val;
+    document.getElementById('toggle-active').classList.toggle('active', val === 'active');
+    document.getElementById('toggle-all').classList.toggle('active',   val === 'all');
+  }
+
+  function escapeHTML(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  async function doSearch() {
+    const q = document.getElementById('search-input').value.trim();
+    if (!q) return;
+
+    const btn = document.getElementById('search-btn');
+    btn.disabled = true;
+    btn.textContent = 'Searching...';
+    showState('loading');
+    document.getElementById('results-bar').style.display = 'none';
+
+    try {
+      // Step 1: get matching event_ids
+      const sp = new URLSearchParams({ q, limit: 200 });
+
+      const sRes = await fetch(SEARCH_URL + '?' + sp);
+      if (!sRes.ok) throw new Error('Search API error: ' + sRes.status);
+      const sData  = await sRes.json();
+      const eventIds = sData.event_ids || [];
+
+      if (!eventIds.length) { showState('empty'); return; }
+
+      // Step 2: fetch dashboard data for matching ids
+      const dp = new URLSearchParams({ event_id: eventIds.join(',') });
+      if (activeFilter === 'active') dp.set('is_active', '1');
+
+      const dRes = await fetch(DASHBOARD_URL + '?' + dp);
+      if (!dRes.ok) throw new Error('Dashboard API error: ' + dRes.status);
+      const markets = await dRes.json();
+
+      allMarkets = Array.isArray(markets) ? markets : [];
+      if (!allMarkets.length) { showState('empty'); return; }
+
+      sortAndRender();
+      document.getElementById('results-bar').style.display = 'flex';
+
+    } catch(e) {
+      console.error(e);
+      showState('error', e.message);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'SEARCH';
+    }
+  }
+
+  function sortAndRender() {
+    const sort = document.getElementById('sort-select').value;
+    const sorted = [...allMarkets].sort((a, b) => {
+      switch(sort) {
+        case 'volume_desc': return (b.event_volume||0) - (a.event_volume||0);
+        case 'volume_asc':  return (a.event_volume||0) - (b.event_volume||0);
+        case 'prob_desc':   return (b.top_market_last_price||0) - (a.top_market_last_price||0);
+        case 'prob_asc':    return (a.top_market_last_price||0) - (b.top_market_last_price||0);
+        case 'title_asc':   return (a.event_title||'').localeCompare(b.event_title||'');
+        default: return 0;
+      }
+    });
+    document.getElementById('results-count').textContent =
+      sorted.length + ' market' + (sorted.length !== 1 ? 's' : '') + ' found';
+    renderMarkets(sorted);
+  }
+
+  function renderMarkets(markets) {
+    const grid  = document.getElementById('market-grid');
+    const state = document.getElementById('state-box');
+    grid.innerHTML = '';
+    grid.style.display = 'flex';
+    state.style.display = 'none';
+    markets.forEach(m => grid.appendChild(buildMarketCard(m)));
+  }
+
+  function buildMarketCard(m) {
+    const wrapper      = document.createElement('div');
+    const isPolymarket = (m.exchange || '').toLowerCase() === 'polymarket';
+    const isKalshi     = (m.exchange || '').toLowerCase() === 'kalshi';
+    const price        = m.top_market_last_price;
+    const pClass       = price == null ? 'mid' : price > 0.65 ? 'high' : price < 0.40 ? 'low' : 'mid';
+    const pct          = price != null ? Math.round(price * 100) + '%' : 'N/A';
+    const subtitle     = m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? m.top_market_subtitle : null;
+    const titleText    = m.event_title + (subtitle ? ' · ' + subtitle : '');
+    const slug         = isPolymarket && m.event_url ? m.event_url.split('/').pop() : null;
+
+    let probSpan;
+    if (m.top_market_id) {
+      const attrs = [
+        'data-market-id="' + m.top_market_id + '"',
+        'data-exchange="' + (m.exchange || '') + '"',
+        'data-source="omd"',
+        (m.top_market_token_id && isPolymarket) ? 'data-token-id="' + m.top_market_token_id + '"' : '',
+        (m.top_market_condition_id && isPolymarket) ? 'data-condition-id="' + m.top_market_condition_id + '"' : '',
+        slug ? 'data-slug="' + slug + '"' : '',
+        m.event_id ? 'data-event-id="' + m.event_id + '"' : '',
+      ].filter(Boolean).join(' ');
+      probSpan = '<span class="prob ' + pClass + ' clickable-prob" ' + attrs + ' onclick="showPriceChart(this)" style="display:inline;font-size:15px;margin-left:16px;vertical-align:middle;">' + pct + '</span>';
+    } else {
+      probSpan = '<span class="prob ' + pClass + '" style="display:inline;font-size:15px;margin-left:16px;vertical-align:middle;">' + pct + '</span>';
+    }
+
+    const cardId = (m.top_market_id || '').replace(/[^a-z0-9]/gi, '_');
+    wrapper.innerHTML =
+      '<div class="market-card" id="card-' + cardId + '">' +
+        '<div class="market-title">' + escapeHTML(titleText) + probSpan + '</div>' +
+        '<div class="market-meta" style="margin-top:6px;">' +
+          (m.subcategory ? '<span class="tag">' + escapeHTML(m.subcategory) + '</span>' : '') +
+          (m.country     ? '<span class="tag">' + escapeHTML(m.country) + '</span>'     : '') +
+          (m.exchange    ? '<span class="tag">' + escapeHTML(m.exchange.toUpperCase()) + '</span>' : '') +
+          '<span class="vol" style="margin-left:auto;">Vol: ' + fmtVol(m.event_volume) + '</span>' +
+        '</div>' +
+      '</div>';
+
+    const card = wrapper.querySelector('.market-card');
+    if (m.top_market_id) {
+      const marketId    = m.top_market_id;
+      const tokenId     = m.top_market_token_id;
+      const conditionId = m.top_market_condition_id;
+      const actions     = document.createElement('div');
+      actions.className = 'market-actions';
+      actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">📈 Price</button>';
+      if (isPolymarket && conditionId) {
+        actions.innerHTML += '<button class="action-btn" onclick="showVolumePanel('' + marketId + '','' + conditionId + '',this)">📊 Volume</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showOpenInterestPanel('' + marketId + '','' + conditionId + '',this)">📐 Open Interest</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showTradesPanel('' + marketId + '','' + conditionId + '',this)">🔄 Trades</button>';
+      }
+      if (isPolymarket && tokenId) {
+        actions.innerHTML += '<button class="action-btn" onclick="showOrderbookPanel('' + marketId + '','' + tokenId + '',this)">📖 Order Book</button>';
+      }
+      if (isKalshi && marketId) {
+        const ticker = marketId.replace(/^ka_/i, '');
+        actions.innerHTML += '<button class="action-btn" onclick="showKalshiTradesPanel('' + marketId + '','' + ticker + '',this)">🔄 Trades</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showKalshiOrderbookPanel('' + marketId + '','' + ticker + '',this)">📖 Order Book</button>';
+      }
+      if (m.event_id) {
+        actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel('' + marketId + '','' + m.event_id + '',this)">🗂 Markets</button>';
+      }
+      card.appendChild(actions);
+    }
+    return wrapper;
+  }
+
+  function showState(state, msg) {
+    const stateBox = document.getElementById('state-box');
+    const grid     = document.getElementById('market-grid');
+    grid.style.display = 'none';
+    grid.innerHTML = '';
+    stateBox.style.display = 'flex';
+    if (state === 'loading') {
+      stateBox.innerHTML = '<div class="spinner"></div><div class="state-title">SEARCHING MARKETS</div>';
+    } else if (state === 'empty') {
+      stateBox.innerHTML = '<div class="state-icon">📭</div><div class="state-title">NO MARKETS FOUND</div><div class="state-sub">Try different keywords or switch to "All Markets" to include closed events.</div>';
+    } else if (state === 'error') {
+      stateBox.innerHTML = '<div class="state-icon">⚠️</div><div class="state-title">ERROR</div><div class="state-sub">' + escapeHTML(msg || 'Could not reach the server. Please try again.') + '</div>';
+    }
+  }
+
+  document.getElementById('search-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doSearch();
+  });
+
+  // ── Panel/chart helper functions (shared with ai-search) ──
+
+function fmtVol(v) {
+    if (v == null) return 'N/A';
+    if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+    return '$' + Math.round(v);
+  }
+  function fmtDate(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+  }
+  function fmtTime(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+ function safeHTML(id, html) { const el=document.getElementById(id); if(el) el.innerHTML=html; }
+ function safeBadge(id, text, color, bg, border) {
+  const el=document.getElementById(id); if(!el) return;
+  el.textContent=text; el.style.color=color; el.style.background=bg; el.style.border=border;
+ }
+ 
+  // ── Message rendering ──────────────────────────────
+  function addUserMsg(text) {
+    hideWelcome();
+    const row = document.createElement('div');
+    row.className = 'msg user';
+    row.innerHTML = `<div class="avatar">YOU</div><div class="bubble">${escapeHTML(text)}</div>`;
+    messagesEl.appendChild(row);
+    scrollToEl(row);
+  }
+  function addTyping() {
+    hideWelcome();
+    const row = document.createElement('div');
+    row.className = 'msg bot'; row.id = 'typing-row';
+    row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    messagesEl.appendChild(row);
+  }
+  function removeTyping() { const el = document.getElementById('typing-row'); if (el) el.remove(); }
+  function addBotMsg(html) {
+    const row = document.createElement('div');
+    row.className = 'msg bot';
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar'; avatar.textContent = 'AI';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = isHTML(html) ? html : `<p>${escapeHTML(html)}</p>`;
+    row.appendChild(avatar); row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    // Inject action buttons into market cards
+    injectActionButtons(bubble);
+    scrollToEl(row);
+    return bubble;
+  }
+  function addErrorMsg(msg) {
+    const row = document.createElement('div');
+    row.className = 'msg bot';
+    row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="error-msg">${escapeHTML(msg)}</div></div>`;
+    messagesEl.appendChild(row); scrollToEl(row);
+  }
+  function setLoading(val) { busy = val; sendBtn.disabled = val; }
+
+  // ── Inject action buttons into market cards ────────
+  function injectActionButtons(bubble) {
+    bubble.querySelectorAll('.market-card').forEach(card => {
+      const probEl      = card.querySelector('.clickable-prob');
+      if (!probEl) return;
+      const marketId    = probEl.dataset.marketId;
+      const tokenId     = probEl.dataset.tokenId;
+      const conditionId = probEl.dataset.conditionId;
+      const eventId     = probEl.dataset.eventId;
+      const exchange    = (probEl.dataset.exchange || '').toLowerCase();
+      if (!marketId) return;
+
+      const isPolymarket = exchange === 'polymarket';
+      const isKalshi = exchange === 'kalshi';
+      const actions = document.createElement('div');
+      actions.className = 'market-actions';
+
+      // 📈 Price — always available if marketId present
+      actions.innerHTML += `<button class="action-btn" onclick="showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'))">📈 Price</button>`;
+
+      // Polymarket-only actions
+      if (isPolymarket && conditionId) {
+        actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showTradesPanel('${marketId}','${conditionId}',this)">🔄 Trades</button>`;
+      }
+      if (isPolymarket && tokenId) {
+        actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
+      }
+      // Kalshi-only actions — extract ticker by stripping 'ka_' prefix
+      if (isKalshi && marketId) {
+        const ticker = marketId.replace(/^ka_/i, '');
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
+      }
+
+    // 🗂 Markets — available when event_id present
+      if (eventId) {
+      actions.innerHTML += `<button class="action-btn" onclick="showMarketsPanel('${marketId}','${eventId}',this)">🗂 Markets</button>`;
+      }
+
+      card.appendChild(actions);
+    });
+  }
+
+  // ── Panel helpers ──────────────────────────────────
+  function panelId(marketId, type) {
+    return `panel-${type}-${marketId.replace(/[^a-z0-9]/gi,'_')}`;
+  }
+
+  function togglePanel(marketCard, pid, buildFn) {
+    const existing = document.getElementById(pid);
+    if (existing) { existing.remove(); return false; }
+    const panel = document.createElement('div');
+    panel.className = 'market-panel'; panel.id = pid;
+    marketCard.insertAdjacentElement('afterend', panel);
+    buildFn(panel);
+    return true;
+  }
+
+  function panelShell(panel, title, subtitle, badgeText, badgeColor) {
+    panel.innerHTML = `
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">${title}</div>
+          ${subtitle ? `<div class="panel-title-sub">${subtitle}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:0;">
+          <span class="panel-badge" id="${panel.id}-badge"
+            style="color:${badgeColor};background:${badgeColor}22;border:1px solid ${badgeColor}44;">
+            ${badgeText}
+          </span>
+          <button class="panel-close" onclick="document.getElementById('${panel.id}').remove()">✕</button>
+        </div>
+      </div>
+      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>
+    `;
+  }
+
+  // ── 📈 PRICE CHART ─────────────────────────────────
+  async function showPriceChart(el) {
+    const marketId    = el.dataset.marketId;
+    const tokenId     = el.dataset.tokenId;
+    const conditionId = el.dataset.conditionId;
+    const exchange    = el.dataset.exchange || 'Polymarket';
+    const card        = el.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const pid         = panelId(marketId, 'price');
+
+    const opened = togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'LOADING', 'var(--accent)');
+
+      try {
+        const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
+        const omdData = await omdRes.json();
+        const prices  = (omdData||[])
+          .filter(r => r.outcome==='Yes' && r.close_price!=null)
+          .sort((a,b) => a.end_period_date.localeCompare(b.end_period_date))
+          .map(r => ({ date:r.end_period_date, price:parseFloat(r.close_price) }));
+
+        if (!prices.length) { document.getElementById(`${pid}-body`).innerHTML = '<div class="panel-loading">No price history available.</div>'; return; }
+
+        let livePrice=null, liveTime=null, hasLive=false;
+        if (exchange==='Polymarket' && tokenId) {
+          try {
+            const lr = await fetch(`${LIVE_PRICE}?token_id=${encodeURIComponent(tokenId)}`);
+            const ld = await lr.json();
+            if (ld.price!=null) { livePrice=parseFloat(ld.price); liveTime=ld.time||null; hasLive=true; }
+          } catch(e) {}
+        }
+
+        const labels = prices.map(p => { const d=new Date(p.date+'T00:00:00'); return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; });
+        const data   = prices.map(p => Math.round(p.price*1000)/10);
+        if (hasLive) {
+          const ld = liveTime ? new Date(liveTime*1000) : new Date();
+          labels.push(`${ld.getMonth()+1}/${ld.getDate()}/${String(ld.getFullYear()).slice(2)} ▲`);
+          data.push(Math.round(livePrice*1000)/10);
+        }
+
+        const firstP=data[0], prevP=data[hasLive?data.length-2:data.length-1], currP=data[data.length-1];
+        const chAll=currP-firstP, ch1d=currP-prevP;
+
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+        const pointColors = data.map((_,i) => hasLive&&i===data.length-1?'#4da6ff':'transparent');
+        const pointRadius = data.map((_,i) => hasLive&&i===data.length-1?5:2);
+
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type:'line',
+          data:{ labels, datasets:[{ data, borderColor:'#00e5a0', borderWidth:1.5,
+            pointBackgroundColor:pointColors, pointBorderColor:pointColors, pointRadius, pointHoverRadius:5,
+            fill:true, backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(0,229,160,0.15)'); g.addColorStop(1,'rgba(0,229,160,0)'); return g; }, tension:0.3 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
+            interaction:{mode:'index',intersect:false},
+            plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+              titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:12},
+              callbacks:{ title:(i)=>{ const l=i[0].label; return l.includes('▲')?l.replace(' ▲','')+' · LIVE':l; }, label:(i)=>` ${i.raw.toFixed(1)}%` } } },
+            scales:{ x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} },
+              y2:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} } } }
+        });
+
+        const badge = document.getElementById(`${pid}-badge`);
+        if (hasLive) { badge.textContent='LIVE'; badge.style.color='var(--accent)'; badge.style.background='var(--accent-dim)'; badge.style.border='1px solid rgba(0,229,160,0.25)'; }
+        else { badge.textContent='EOD'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)'; }
+
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Current</div><div class="stat-value">${currP.toFixed(1)}%</div></div>
+          <div class="stat"><div class="stat-label">1D Change</div><div class="stat-value ${ch1d>=0?'up':'down'}">${ch1d>=0?'+':''}${ch1d.toFixed(1)}%</div></div>
+          <div class="stat"><div class="stat-label">All-Time Change</div><div class="stat-value ${chAll>=0?'up':'down'}">${chAll>=0?'+':''}${chAll.toFixed(1)}%</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">As of</div><div class="stat-value" style="font-size:11px;">${hasLive?'Live':'Prior Day Close'}</div></div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML = '<div class="panel-loading">Failed to load price data.</div>'; console.error(e); }
+    });
+  }
+
+  // ── 📊 VOLUME CHART ───────────────────────────────
+  async function showVolumePanel(marketId, conditionId, btn) {
+    const card = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const pid   = panelId(marketId, 'volume');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)');
+      try {
+        const res  = await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
+        const json = await res.json();
+        const pts  = (json.data || []).sort((a,b)=>a.timestamp-b.timestamp);
+
+        if (!pts.length) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No volume data available.</div>'; return; }
+
+        const labels   = pts.map(p => fmtDate(p.timestamp));
+        const yesVol   = pts.map(p => Math.round((p.yes_volume||0)*100)/100);
+        const noVol    = pts.map(p => Math.round((p.no_volume||0)*100)/100);
+        const totalVol = pts.reduce((s,p)=>(s+(p.total_volume||0)),0);
+
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent='90D'; badge.style.color='var(--blue)'; badge.style.background='var(--blue-dim)'; badge.style.border='1px solid rgba(77,166,255,0.25)';
+
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type:'bar',
+          data:{ labels, datasets:[
+            { label:'YES', data:yesVol, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, stack:'vol' },
+            { label:'NO',  data:noVol,  backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, stack:'vol' }
+          ]},
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},
+              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+                titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
+                callbacks:{ label:(i)=>` ${i.dataset.label}: ${fmtVol(i.raw)}` } } },
+            scales:{ x:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
+        });
+
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">${fmtVol(totalVol)}</div></div>
+          <div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">${fmtVol(yesVol.reduce((s,v)=>s+v,0))}</div></div>
+          <div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">${fmtVol(noVol.reduce((s,v)=>s+v,0))}</div></div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load volume data.</div>'; console.error(e); }
+    });
+  }
+
+// ── 📖 ORDER BOOK ─────────────────────────────────
+  async function showOrderbookPanel(marketId, tokenId, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const pid   = panelId(marketId, 'orderbook');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
+      try {
+        const res  = await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
+        const json = await res.json();
+        const snap = (json.snapshots||[])[0];
+
+        if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
+
+        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
+        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
+
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
+
+        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
+        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
+        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
+
+        // Single dataset with per-bar colors — centers each bar in its slot
+        const combinedData = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
+          return bid ? bid.size : (ask ? ask.size : 0);
+        });
+        const barColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
+        });
+        const borderColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
+        });
+
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `
+          <div style="display:flex;gap:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+            </div>
+          </div>
+          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+          <div class="panel-stats" id="${pid}-stats"></div>`;
+
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type: 'bar',
+          data: {
+            labels: allPriceLabels,
+            datasets: [{
+              data: combinedData,
+              backgroundColor: barColors,
+              borderColor: borderColors,
+              borderWidth: 0,
+              barPercentage: 0.8,
+              categoryPercentage: 0.9
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: {duration: 300},
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                titleColor: '#8a9099', bodyColor: '#f0f2f5',
+                titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
+                bodyFont: {family: "'IBM Plex Mono',monospace", size: 11},
+                callbacks: {
+                  label: (i) => {
+                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
+                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} shares`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { offset: true, grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}, maxRotation: 0}, border: {color: 'rgba(255,255,255,0.07)'} },
+              y: { grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}}, border: {color: 'rgba(255,255,255,0.07)'} }
+            }
+          }
+        });
+
+        const spread = asks.length && bids.length ? ((asks[0].price - bids[0].price)*100).toFixed(1) : 'N/A';
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
+          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread !== 'N/A' ? spread+'%' : 'N/A'}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp/1000) : 'Recent'}</div></div>`;
+
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load orderbook data.</div>'; console.error(e); }
+    });
+  }
+ 
+  // ── 🔄 TRADES TABLE ───────────────────────────────
+  async function showTradesPanel(marketId, conditionId, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const pid   = panelId(marketId, 'trades');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)');
+      try {
+        const res  = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
+        const json = await res.json();
+        const trades = (json.trades || []).slice(0, 20);
+
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent=`${trades.length} TRADES`; badge.style.color='var(--text2)'; badge.style.background='var(--bg4)'; badge.style.border='1px solid var(--border2)';
+
+        const body = document.getElementById(`${pid}-body`);
+        if (!trades.length) { body.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>'; return; }
+
+        const rows = trades.map(t => {
+          const side    = t.side === 'BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
+          const outcome = t.is_yes_side ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
+          const price   = (t.price * 100).toFixed(1) + '%';
+          const amount  = fmtVol(t.amount_usd);
+          const time    = fmtTime(t.timestamp);
+          const wallet  = t.user ? t.user.slice(0,6)+'...'+t.user.slice(-4) : 'N/A';
+          return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${wallet}</td></tr>`;
+        }).join('');
+
+        body.innerHTML = `
+          <div style="overflow-x:auto;margin-top:4px;">
+            <table class="trades-table">
+              <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load trades data.</div>'; console.error(e); }
+    });
+  }
+
+  // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
+  async function showKalshiTradesPanel(marketId, ticker, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const pid   = panelId(marketId, 'trades');
+ 
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)');
+      try {
+        const res = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
+        const json   = await res.json();
+        const trades = (json.trades || []).filter(t => (t.amount_usd || 0) >= 1000).slice(0, 20);
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent = `${trades.length} TRADES`;
+        badge.style.color = 'var(--text2)';
+        badge.style.background = 'var(--bg4)';
+        badge.style.border = '1px solid var(--border2)';
+ 
+        const body = document.getElementById(`${pid}-body`);
+        if (!trades.length) {
+          body.innerHTML = '<div class="panel-loading">No trades found in the last 7 days.</div>';
+          return;
+        }
+ 
+        const rows = trades.map(t => {
+          const side    = t.side === 'BUY'
+            ? '<span class="buy">BUY</span>'
+            : '<span class="sell">SELL</span>';
+          const outcome = t.is_yes_side
+            ? '<span class="yes">YES</span>'
+            : '<span class="no">NO</span>';
+          const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
+          
+          const amount  = fmtVol(t.amount_usd);
+          const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
+          const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
+          return `<tr>
+            <td>${time}</td>
+            <td>${side}</td>
+            <td>${outcome}</td>
+            <td>${price}</td>
+            <td>${amount}</td>
+            <td style="color:var(--text3)">${contracts}</td>
+          </tr>`;
+        }).join('');
+ 
+        body.innerHTML = `
+          <div style="overflow-x:auto;margin-top:4px;">
+            <table class="trades-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Side</th>
+                  <th>Outcome</th>
+                  <th>Price</th>
+                  <th>~Amount</th>
+                  <th>Contracts</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch(e) {
+        document.getElementById(`${pid}-body`).innerHTML =
+          '<div class="panel-loading">Failed to load trades data.</div>';
+        console.error(e);
+      }
+    });
+  }
+ 
+  // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
+  async function showKalshiOrderbookPanel(marketId, ticker, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const pid   = panelId(marketId, 'orderbook');
+ 
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
+      try {
+        const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
+        const json = await res.json();
+        // Response is already normalized by proxy — bids/asks with decimal prices
+        const snap = (json.snapshots || [])[0];
+ 
+        if (!snap) {
+          document.getElementById(`${pid}-body`).innerHTML =
+            '<div class="panel-loading">No orderbook data available.</div>';
+          return;
+        }
+ 
+        const bids = (snap.bids || []).sort((a,b) => b.price - a.price).slice(0, 15);
+        const asks = (snap.asks || []).sort((a,b) => a.price - b.price).slice(0, 15);
+ 
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent = 'LIVE';
+        badge.style.color = 'var(--amber)';
+        badge.style.background = 'var(--amber-dim)';
+        badge.style.border = '1px solid rgba(240,165,0,0.25)';
+ 
+        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
+        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
+        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])]
+          .sort((a,b) => parseFloat(a) - parseFloat(b));
+ 
+        const combinedData = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
+          return bid ? bid.size : (ask ? ask.size : 0);
+        });
+        const barColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
+        });
+        const borderColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
+        });
+ 
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `
+          <div style="display:flex;gap:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+            </div>
+          </div>
+          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+          <div class="panel-stats" id="${pid}-stats"></div>`;
+ 
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type: 'bar',
+          data: {
+            labels: allPriceLabels,
+            datasets: [{
+              data: combinedData,
+              backgroundColor: barColors,
+              borderColor: borderColors,
+              borderWidth: 0,
+              barPercentage: 0.8,
+              categoryPercentage: 0.9
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                titleColor: '#8a9099', bodyColor: '#f0f2f5',
+                titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+                bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
+                callbacks: {
+                  label: (i) => {
+                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
+                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} contracts`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { offset: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+              y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 } }, border: { color: 'rgba(255,255,255,0.07)' } }
+            }
+          }
+        });
+ 
+        const bestBid = snap.best_bid ? (snap.best_bid * 100).toFixed(1) + '%' : (bids.length ? (bids[0].price * 100).toFixed(1) + '%' : 'N/A');
+        const bestAsk = snap.best_ask ? (snap.best_ask * 100).toFixed(1) + '%' : (asks.length ? (asks[0].price * 100).toFixed(1) + '%' : 'N/A');
+        const spread  = bids.length && asks.length
+          ? ((asks[0].price - bids[0].price) * 100).toFixed(1) + '%'
+          : 'N/A';
+ 
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div>
+          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div>
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp / 1000) : 'Recent'}</div></div>`;
+ 
+      } catch(e) {
+        document.getElementById(`${pid}-body`).innerHTML =
+          '<div class="panel-loading">Failed to load orderbook data.</div>';
+        console.error(e);
+      }
+    });
+  }
+
+async function showOpenInterestPanel(marketId, conditionId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+  const pid   = panelId(marketId, 'oi');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)');
+    try {
+      const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
+      const json = await res.json();
+      const pts = (json.open_interest_over_time || []).sort((a,b) => a.timestamp - b.timestamp);
+
+      if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No open interest data available.</div>'); return; }
+
+      const labels  = pts.map(p => fmtDate(p.timestamp));
+      const data = pts.map(p => Math.round((p.open_interest_usd || 0) * 100) / 100);
+      const currOI  = data[data.length - 1];
+      const prevOI  = data[0];
+      const chOI    = currOI - prevOI;
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+      safeBadge(`${pid}-badge`, '90D', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
+
+      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+      const canvasEl = document.getElementById(`${pid}-canvas`);
+      if (!canvasEl) return;
+      chartInstances[pid] = new Chart(canvasEl, {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: '#f0a500', borderWidth: 1.5,
+          pointRadius: 0, pointHoverRadius: 4, fill: true,
+          backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(240,165,0,0.15)'); g.addColorStop(1,'rgba(240,165,0,0)'); return g; },
+          tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            titleColor: '#8a9099', bodyColor: '#f0f2f5',
+            titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+            bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
+            callbacks: { label: (i) => ` ${fmtVol(i.raw)}` } } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
+          } }
+      });
+
+      safeHTML(`${pid}-stats`, `
+        <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
+        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
+        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
+        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
+    } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
+  });
+}
+
+async function showMarketsPanel(marketId, eventId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+  const pid   = panelId(marketId, 'markets');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, 'All markets for this event', 'LOADING', 'var(--text2)');
+    try {
+      const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
+      const json   = await res.json();
+      const markets = (json || []).sort((a,b) => (b.market_volume||0) - (a.market_volume||0));
+
+      safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      if (!markets.length) { bodyEl.innerHTML = '<div class="panel-loading">No markets found for this event.</div>'; return; }
+
+      const rows = markets.map(m => {
+        const prob      = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
+        const probClass = m.yes_price > 0.65 ? 'color:var(--accent)' : m.yes_price < 0.40 ? 'color:var(--red)' : 'color:var(--amber)';
+        const vol       = fmtVol(m.market_volume);
+        const expires   = m.expiration_date ? m.expiration_date : 'N/A';
+        const active    = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
+        const label     = m.market_subtitle ? escapeHTML(m.market_subtitle) : escapeHTML(m.market_title);
+        return `<tr>
+          <td>${active} ${label}</td>
+          <td style="font-family:var(--mono);${probClass};font-weight:500;">${prob}</td>
+          <td>${vol}</td>
+          <td style="color:var(--text3);">${expires}</td>
+        </tr>`;
+      }).join('');
+
+      bodyEl.innerHTML = `
+        <div style="overflow-x:auto;margin-top:4px;">
+          <table class="trades-table">
+            <thead><tr><th>Market</th><th>Yes %</th><th>Volume</th><th>Expires</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+     console.error(e) 
+     safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
+      console.error(e);
+    }
+  });
+} 
+ 
+  // ── Chat send ──────────────────────────────────────
+
+</script>
+
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+
+</body>
+</html>
