@@ -448,22 +448,34 @@
       const conditionId = m.top_market_condition_id;
       const actions     = document.createElement('div');
       actions.className = 'market-actions';
-      actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">📈 Price</button>';
+
+      function makeBtn(label, fn) {
+        const b = document.createElement('button');
+        b.className = 'action-btn';
+        b.textContent = label;
+        b.onclick = fn;
+        return b;
+      }
+
+      actions.appendChild(makeBtn('📈 Price', function() {
+        showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'));
+      }));
+
       if (isPolymarket && conditionId) {
-        actions.innerHTML += '<button class="action-btn" onclick="showVolumePanel('" + marketId + "','" + conditionId + "',this)">📊 Volume</button>';
-        actions.innerHTML += '<button class="action-btn" onclick="showOpenInterestPanel('" + marketId + "','" + conditionId + "',this)">📐 Open Interest</button>';
-        actions.innerHTML += '<button class="action-btn" onclick="showTradesPanel('" + marketId + "','" + conditionId + "',this)">🔄 Trades</button>';
+        actions.appendChild(makeBtn('📊 Volume', function() { showVolumePanel(marketId, conditionId, this); }));
+        actions.appendChild(makeBtn('📐 Open Interest', function() { showOpenInterestPanel(marketId, conditionId, this); }));
+        actions.appendChild(makeBtn('🔄 Trades', function() { showTradesPanel(marketId, conditionId, this); }));
       }
       if (isPolymarket && tokenId) {
-        actions.innerHTML += '<button class="action-btn" onclick="showOrderbookPanel('" + marketId + "','" + tokenId + "',this)">📖 Order Book</button>';
+        actions.appendChild(makeBtn('📖 Order Book', function() { showOrderbookPanel(marketId, tokenId, this); }));
       }
       if (isKalshi && marketId) {
         const ticker = marketId.replace(/^ka_/i, '');
-        actions.innerHTML += '<button class="action-btn" onclick="showKalshiTradesPanel('" + marketId + "','" + ticker + "',this)">🔄 Trades</button>';
-        actions.innerHTML += '<button class="action-btn" onclick="showKalshiOrderbookPanel('" + marketId + "','" + ticker + "',this)">📖 Order Book</button>';
+        actions.appendChild(makeBtn('🔄 Trades', function() { showKalshiTradesPanel(marketId, ticker, this); }));
+        actions.appendChild(makeBtn('📖 Order Book', function() { showKalshiOrderbookPanel(marketId, ticker, this); }));
       }
       if (m.event_id) {
-        actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel('" + marketId + "','" + m.event_id + "',this)">🗂 Markets</button>';
+        actions.appendChild(makeBtn('🗂 Markets', function() { showMarketsPanel(marketId, m.event_id, this); }));
       }
       card.appendChild(actions);
     }
