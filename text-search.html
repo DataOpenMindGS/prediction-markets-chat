@@ -450,20 +450,20 @@
       actions.className = 'market-actions';
       actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">📈 Price</button>';
       if (isPolymarket && conditionId) {
-        actions.innerHTML += '<button class="action-btn" onclick="showVolumePanel('' + marketId + '','' + conditionId + '',this)">📊 Volume</button>';
-        actions.innerHTML += '<button class="action-btn" onclick="showOpenInterestPanel('' + marketId + '','' + conditionId + '',this)">📐 Open Interest</button>';
-        actions.innerHTML += '<button class="action-btn" onclick="showTradesPanel('' + marketId + '','' + conditionId + '',this)">🔄 Trades</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showVolumePanel('" + marketId + "','" + conditionId + "',this)">📊 Volume</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showOpenInterestPanel('" + marketId + "','" + conditionId + "',this)">📐 Open Interest</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showTradesPanel('" + marketId + "','" + conditionId + "',this)">🔄 Trades</button>';
       }
       if (isPolymarket && tokenId) {
-        actions.innerHTML += '<button class="action-btn" onclick="showOrderbookPanel('' + marketId + '','' + tokenId + '',this)">📖 Order Book</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showOrderbookPanel('" + marketId + "','" + tokenId + "',this)">📖 Order Book</button>';
       }
       if (isKalshi && marketId) {
         const ticker = marketId.replace(/^ka_/i, '');
-        actions.innerHTML += '<button class="action-btn" onclick="showKalshiTradesPanel('' + marketId + '','' + ticker + '',this)">🔄 Trades</button>';
-        actions.innerHTML += '<button class="action-btn" onclick="showKalshiOrderbookPanel('' + marketId + '','' + ticker + '',this)">📖 Order Book</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showKalshiTradesPanel('" + marketId + "','" + ticker + "',this)">🔄 Trades</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showKalshiOrderbookPanel('" + marketId + "','" + ticker + "',this)">📖 Order Book</button>';
       }
       if (m.event_id) {
-        actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel('' + marketId + '','' + m.event_id + '',this)">🗂 Markets</button>';
+        actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel('" + marketId + "','" + m.event_id + "',this)">🗂 Markets</button>';
       }
       card.appendChild(actions);
     }
