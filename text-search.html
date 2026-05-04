@@ -1272,9 +1272,8 @@ async function showMarketsPanel(marketId, eventId, btn) {
       const raw  = data.history || [];
 
       if (!raw.length) {
-        // No data — close panel and hide the button so it doesn't clutter the card
-        document.getElementById(pid)?.remove();
-        btn.style.display = 'none';
+        safeHTML(`${pid}-body`, '<div class="panel-loading">No forecast data available for this market.</div>');
+        safeBadge(`${pid}-badge`, 'N/A', 'var(--text3)', 'var(--bg4)', '1px solid var(--border2)');
         return;
       }
 
