@@ -1256,7 +1256,9 @@ async function showMarketsPanel(marketId, eventId, btn) {
 
     try {
       const now      = Math.floor(Date.now() / 1000);
-      const start    = now - (90 * 86400);  // 90 days back
+      const start = isKalshi
+        ? now - (90 * 86400)   // Kalshi: 90 days
+        : now - (15 * 86400);  // Polymarket: 15 day max
       const isKalshi = exchange.toLowerCase() === 'kalshi';
 
       // Choose endpoint based on exchange
