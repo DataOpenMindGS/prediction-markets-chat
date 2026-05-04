@@ -518,6 +518,11 @@
         actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
       }
      if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#9776; Markets</button>';} 
+     if ((isPolymarket || isKalshi) && m.event_id) {
+       const rawEventId = m.event_id.replace(/^pm_|^ka_/i, '');
+       const exchName = m.exchange || '';
+       actions.innerHTML += '<button class="action-btn" onclick="showForecastPanel(\'' + marketId + '\',\'' + exchName + '\',\'' + rawEventId + '\',this)">📈 Forecast</button>';
+     }
      card.appendChild(actions);
     }
     return wrapper;
@@ -1042,6 +1047,152 @@ async function showMarketsPanel(marketId, eventId, btn) {
     await applyFilters();
   }
   init();
+
+
+  // ── 📈 FORECAST PANEL ──────────────────────────────────
+  async function showForecastPanel(marketId, exchange, rawEventId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+  const pid   = panelId(marketId, 'forecast');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, 'Market forecast history', 'LOADING', 'var(--accent)');
+
+    try {
+      const now      = Math.floor(Date.now() / 1000);
+      const isKalshi = exchange.toLowerCase() === 'kalshi';
+      const start    = isKalshi
+        ? now - (90 * 86400)   // Kalshi supports 90 days
+        : now - (15 * 86400);  // Polymarket max is 15 days
+
+      // Choose endpoint based on exchange
+      const url = isKalshi
+        ? `${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`
+        : `${API_BASE}/get_polymarket_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&fidelity=60`;
+
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error(`Forecast API error: ${res.status}`);
+      const data = await res.json();
+      const raw  = data.history || [];
+
+      if (!raw.length) {
+        safeHTML(`${pid}-body`, '<div class="panel-loading">No forecast data available for this market.</div>');
+        safeBadge(`${pid}-badge`, 'N/A', 'var(--text3)', 'var(--bg4)', '1px solid var(--border2)');
+        return;
+      }
+
+      // Normalize values:
+      // Kalshi returns raw decimal (0.21 = 0.21%), Polymarket returns display units (3.65 = 3.65%)
+      // Both should be displayed as-is since they're already in the right scale for their markets
+      const pts = raw
+        .filter(d => d.p !== null && d.p !== undefined && Math.abs(d.p) < 1000)
+        .sort((a, b) => a.t - b.t);
+
+      if (!pts.length) {
+        safeHTML(`${pid}-body`, '<div class="panel-loading">No valid forecast data found.</div>');
+        return;
+      }
+
+      const labels = pts.map(d => {
+        const dt = new Date(d.t * 1000);
+        return `${dt.getMonth()+1}/${dt.getDate()}/${String(dt.getFullYear()).slice(2)}`;
+      });
+      const values = pts.map(d => Math.round(d.p * 10000) / 10000);
+
+      const currVal  = values[values.length - 1];
+      const prevVal  = values[0];
+      const change   = currVal - prevVal;
+      const minVal   = Math.min(...values);
+      const maxVal   = Math.max(...values);
+
+      // Display raw values as returned by the API — no unit conversion
+      const fmt = v => parseFloat(v.toFixed(6)).toString();
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+      safeBadge(`${pid}-badge`, exchange.toUpperCase(), 'var(--accent)', 'var(--accent-dim)', '1px solid rgba(0,229,160,0.25)');
+
+      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+      const canvasEl = document.getElementById(`${pid}-canvas`);
+      if (!canvasEl) return;
+
+      chartInstances[pid] = new Chart(canvasEl, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: '#00e5a0',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            fill: true,
+            backgroundColor: (ctx) => {
+              const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 140);
+              g.addColorStop(0, 'rgba(0,229,160,0.15)');
+              g.addColorStop(1, 'rgba(0,229,160,0)');
+              return g;
+            },
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#161c24',
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              titleColor: '#8a9099',
+              bodyColor: '#f0f2f5',
+              titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+              bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
+              callbacks: {
+                label: (i) => ` Forecast: ${fmt(i.raw)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            },
+            y: {
+              min: minVal - Math.abs(minVal * 0.02),
+              max: maxVal + Math.abs(maxVal * 0.02),
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: '#8a9099',
+                font: { family: "'IBM Plex Mono',monospace", size: 11 },
+                callback: v => fmt(v)
+              },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            }
+          }
+        }
+      });
+
+      safeHTML(`${pid}-stats`, `
+        <div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div>
+        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '+' : ''}${fmt(change)}</div></div>
+        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmt(maxVal)}</div></div>
+        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmt(minVal)}</div></div>
+        <div class="stat" style="margin-left:auto;"><div class="stat-label">Source</div><div class="stat-value" style="font-size:11px;">${exchange.toUpperCase()}</div></div>`);
+
+    } catch(e) {
+      safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load forecast data.</div>');
+      console.error(e);
+    }
+  });
+}
+
 </script>
 <div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
 <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
