@@ -381,7 +381,7 @@
       if (eventId) {
       actions.innerHTML += `<button class="action-btn" onclick="showMarketsPanel('${marketId}','${eventId}',this)">🗂 Markets</button>`;
       }
-      if ((isPolymarket || isKalshi) && eventId) {
+      if ((isPolymarket || isKalshi) && eventId && m.is_forecast_market) {
         const rawEventId = eventId.replace(/^pm_|^ka_/i, '');
         const exchName = exchange || '';
         actions.innerHTML += `<button class="action-btn" onclick="showForecastPanel('${marketId}','${exchName}','${rawEventId}',this)">📈 Forecast</button>`;
@@ -407,23 +407,24 @@
   }
 
   function panelShell(panel, title, subtitle, badgeText, badgeColor, marketSubtitle) {
-    panel.innerHTML = `
-      <div class="panel-header">
-        <div>
-          <div class="panel-title">${title}</div>
-          ${marketSubtitle ? `<div class="panel-title-sub" style="color:var(--text2);margin-bottom:2px;">${marketSubtitle}</div>` : ''}
-          ${subtitle ? `<div class="panel-title-sub">${subtitle}</div>` : ''}
-        </div>
-        <div style="display:flex;align-items:center;gap:0;">
-          <span class="panel-badge" id="${panel.id}-badge"
-            style="color:${badgeColor};background:${badgeColor}22;border:1px solid ${badgeColor}44;">
-            ${badgeText}
-          </span>
-          <button class="panel-close" onclick="document.getElementById('${panel.id}').remove()">✕</button>
-        </div>
-      </div>
-      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>
-    `;
+    const mktSubLine = marketSubtitle ? '<div class="panel-title-sub" style="color:var(--text2);margin-bottom:2px;">' + marketSubtitle + '</div>' : '';
+    const subLine    = subtitle ? '<div class="panel-title-sub">' + subtitle + '</div>' : '';
+    panel.innerHTML =
+      '<div class="panel-header">' +
+        '<div>' +
+          '<div class="panel-title">' + title + '</div>' +
+          mktSubLine +
+          subLine +
+        '</div>' +
+        '<div style="display:flex;align-items:center;gap:0;">' +
+          '<span class="panel-badge" id="' + panel.id + '-badge"' +
+            ' style="color:' + badgeColor + ';background:' + badgeColor + '22;border:1px solid ' + badgeColor + '44;">' +
+            badgeText +
+          '</span>' +
+          '<button class="panel-close" onclick="document.getElementById(\'' + panel.id + '\').remove()">✕</button>' +
+        '</div>' +
+      '</div>' +
+      '<div id="' + panel.id + '-body"><div class="panel-loading">Loading...</div></div>';
   }
 
   // ── 📈 PRICE CHART ─────────────────────────────────
