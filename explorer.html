@@ -519,7 +519,7 @@
         actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
       }
      if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#9776; Markets</button>';} 
-     if ((isPolymarket || isKalshi) && m.event_id) {
+     if ((isPolymarket || isKalshi) && m.event_id && m.is_forecast_market) {
        const rawEventId = m.event_id.replace(/^pm_|^ka_/i, '');
        const exchName = m.exchange || '';
        actions.innerHTML += '<button class="action-btn" onclick="showForecastPanel(\'' + marketId + '\',\'' + exchName + '\',\'' + rawEventId + '\',this)">📈 Forecast</button>';
