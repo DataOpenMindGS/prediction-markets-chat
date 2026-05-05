@@ -594,6 +594,7 @@
     const exchange = el.dataset.exchange || 'Polymarket';
     const card     = el.closest('.market-card');
     const title    = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid      = panelId(marketId, 'price');
 
     togglePanel(card, pid, async (panel) => {
@@ -944,6 +945,7 @@
  async function showOpenInterestPanel(marketId, conditionId, btn) {
   const card  = btn.closest('.market-card');
   const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
   const pid   = panelId(marketId, 'oi');
 
   togglePanel(card, pid, async (panel) => {
@@ -1002,6 +1004,7 @@
 async function showMarketsPanel(marketId, eventId, btn) {
   const card  = btn.closest('.market-card');
   const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
   const pid   = panelId(marketId, 'markets');
 
   togglePanel(card, pid, async (panel) => {
@@ -1062,6 +1065,7 @@ async function showMarketsPanel(marketId, eventId, btn) {
   async function showForecastPanel(marketId, exchange, rawEventId, btn) {
   const card  = btn.closest('.market-card');
   const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
   const pid   = panelId(marketId, 'forecast');
 
   togglePanel(card, pid, async (panel) => {
