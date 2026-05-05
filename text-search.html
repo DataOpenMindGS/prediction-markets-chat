@@ -500,7 +500,7 @@
       if (m.event_id) {
         actions.appendChild(makeBtn('🗂 Markets', function() { showMarketsPanel(marketId, m.event_id, this); }));
       }
-      if ((isPolymarket || isKalshi) && m.event_id) {
+      if ((isPolymarket || isKalshi) && m.event_id && m.is_forecast_market) {
         const rawEventId = m.event_id.replace(/^pm_|^ka_/i, '');
         actions.appendChild(makeBtn('📈 Forecast', function() {
           showForecastPanel(marketId, m.exchange || '', rawEventId, this);
