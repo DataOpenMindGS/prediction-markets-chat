@@ -685,7 +685,7 @@ function fmtVol(v) {
     const pid         = panelId(marketId, 'price');
 
     const opened = togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'LOADING', 'var(--accent)');
+      panelShell(panel, title, '', 'LOADING', 'var(--accent)');
 
       try {
         const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
