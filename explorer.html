@@ -95,6 +95,7 @@
   /* ── Market card ── */
   .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; transition:border-color 0.15s; }
   .market-card:hover { border-color:var(--border2); }
+  .market-subtitle { font-size:11px; color:var(--text2); line-height:1.4; margin-bottom:6px; display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
   .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:6px; overflow:hidden; }
   .market-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
   .prob { font-family:var(--mono); font-size:17px; font-weight:500; display:inline; margin-left:16px; vertical-align:middle; }
@@ -487,7 +488,7 @@
 
     wrapper.innerHTML = `
       <div class="market-card" id="card-${m.top_market_id?.replace(/[^a-z0-9]/gi,'_')}">
-        <div class="market-title">${escapeHTML(titleText)}${probHTML}</div>
+        <div class="market-title">${escapeHTML(m.event_title)}</div><div class="market-subtitle">${subtitle ? escapeHTML(subtitle) + " " : ""}${probHTML}</div>
         <div class="market-meta">
           ${m.subcategory ? `<span class="tag">${escapeHTML(m.subcategory)}</span>` : ''}
           ${m.country     ? `<span class="tag">${escapeHTML(m.country)}</span>`     : ''}
@@ -564,14 +565,15 @@
     return true;
   }
 
-  function panelShell(panel, title, subtitle, badgeText, badgeColor) {
+  function panelShell(panel, title, subtitle, badgeText, badgeColor, marketSubtitle) {
     panel.innerHTML = `
       <div class="panel-header">
-        <div style="flex:1;padding-right:8px;">
+        <div>
           <div class="panel-title">${title}</div>
+          ${marketSubtitle ? `<div class="panel-title-sub" style="color:var(--text2);margin-bottom:2px;">${marketSubtitle}</div>` : ''}
           ${subtitle ? `<div class="panel-title-sub">${subtitle}</div>` : ''}
         </div>
-        <div style="display:flex;align-items:center;gap:0;flex-shrink:0;">
+        <div style="display:flex;align-items:center;gap:0;">
           <span class="panel-badge" id="${panel.id}-badge"
             style="color:${badgeColor};background:${badgeColor}22;border:1px solid ${badgeColor}44;">
             ${badgeText}
@@ -579,7 +581,8 @@
           <button class="panel-close" onclick="document.getElementById('${panel.id}').remove()">✕</button>
         </div>
       </div>
-      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>`;
+      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>
+    `;
   }
 
   // ── 📈 PRICE CHART ──────────────────────────────────
@@ -593,7 +596,7 @@
     const pid      = panelId(marketId, 'price');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, '', 'LOADING', 'var(--accent)');
+      panelShell(panel, title, '', 'LOADING', 'var(--accent)', subtitle);
       try {
         const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
         const omdData = await omdRes.json();
@@ -665,10 +668,11 @@
   async function showVolumePanel(marketId, conditionId, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'volume');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)');
+      panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)', subtitle);
       try {
         const res  = await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
         const json = await res.json();
@@ -717,10 +721,11 @@
   async function showOrderbookPanel(marketId, tokenId, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'orderbook');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
       try {
         const res  = await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
         const json = await res.json();
@@ -785,10 +790,11 @@
   async function showTradesPanel(marketId, conditionId, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'trades');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)');
+      panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)', subtitle);
       try {
         const res    = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
         const json   = await res.json();
@@ -825,10 +831,11 @@
   async function showKalshiTradesPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'trades');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)');
+      panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)', subtitle);
       try {
         const res    = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
         const json   = await res.json();
@@ -865,10 +872,11 @@
   async function showKalshiOrderbookPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'orderbook');
 
     togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)');
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
       try {
         const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
         const json = await res.json();
@@ -938,7 +946,7 @@
   const pid   = panelId(marketId, 'oi');
 
   togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)');
+    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)', subtitle);
     try {
       const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
       const json = await res.json();
