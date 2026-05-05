@@ -1265,7 +1265,7 @@ async function showMarketsPanel(marketId, eventId, btn) {
   const pid   = panelId(marketId, 'forecast');
 
   togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, 'Market forecast history', 'LOADING', 'var(--accent)', subtitle);
+    panelShell(panel, title, 'Market forecast history', 'LOADING', 'var(--accent)');
 
     try {
       const now      = Math.floor(Date.now() / 1000);
