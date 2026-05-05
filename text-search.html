@@ -162,7 +162,8 @@
   /* ── Standalone market cards (text-search) ── */
   .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; transition:border-color 0.15s; }
   .market-card:hover { border-color:var(--border2); }
-  .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:6px; overflow:hidden; }
+  .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:2px; overflow:hidden; }
+  .market-subtitle { font-size:11px; color:var(--text2); line-height:1.4; margin-bottom:6px; display:flex; align-items:center; flex-wrap:wrap; gap:4px; }
   .market-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
   .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); }
   .vol { font-family:var(--mono); font-size:11px; color:var(--text2); margin-left:auto; }
@@ -433,7 +434,8 @@
     const pClass       = price == null ? 'mid' : price > 0.65 ? 'high' : price < 0.40 ? 'low' : 'mid';
     const pct          = price != null ? Math.round(price * 100) + '%' : 'N/A';
     const subtitle     = m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? m.top_market_subtitle : null;
-    const titleText    = m.event_title + (subtitle ? ' · ' + subtitle : '');
+    const titleText    = m.event_title;  // event title on first line
+    const sublineText  = (subtitle || m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? (subtitle || m.top_market_subtitle) : null);
     const slug         = isPolymarket && m.event_url ? m.event_url.split('/').pop() : null;
 
     let probSpan;
@@ -455,7 +457,8 @@
     const cardId = (m.top_market_id || '').replace(/[^a-z0-9]/gi, '_');
     wrapper.innerHTML =
       '<div class="market-card" id="card-' + cardId + '">' +
-        '<div class="market-title">' + escapeHTML(titleText) + probSpan + '</div>' +
+        '<div class="market-title">' + escapeHTML(titleText) + '</div>' +
+        '<div class="market-subtitle">' + (sublineText ? escapeHTML(sublineText) + ' ' : '') + probSpan + '</div>' +
         '<div class="market-meta">' +
           (m.subcategory ? '<span class="tag">' + escapeHTML(m.subcategory) + '</span>' : '') +
           (m.country     ? '<span class="tag">' + escapeHTML(m.country) + '</span>'     : '') +
@@ -1203,7 +1206,7 @@ async function showMarketsPanel(marketId, eventId, btn) {
       const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
       const json   = await res.json();
       const arr = Array.isArray(json) ? json : (json?.markets || json?.data || json?.results || Object.values(json) || []);
-      const markets = arr.sort((a,b) => (b.market_volume||0) - (a.market_volume||0));
+      const markets = arr.sort((a,b) => (b.yes_price||0) - (a.yes_price||0));
 
       safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
 
