@@ -684,7 +684,6 @@ function fmtVol(v) {
     const card        = el.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid         = panelId(marketId, 'price');
 
     const opened = togglePanel(card, pid, async (panel) => {
@@ -760,7 +759,6 @@ function fmtVol(v) {
     const card = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'volume');
 
     togglePanel(card, pid, async (panel) => {
@@ -811,7 +809,6 @@ function fmtVol(v) {
   async function showOrderbookPanel(marketId, tokenId, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'orderbook');
 
@@ -918,7 +915,6 @@ function fmtVol(v) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'trades');
 
     togglePanel(card, pid, async (panel) => {
@@ -959,7 +955,6 @@ function fmtVol(v) {
   async function showKalshiTradesPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'trades');
  
@@ -1031,7 +1026,6 @@ function fmtVol(v) {
   async function showKalshiOrderbookPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid   = panelId(marketId, 'orderbook');
  
