@@ -678,7 +678,7 @@ function fmtVol(v) {
     const conditionId = el.dataset.conditionId;
     const exchange    = el.dataset.exchange || 'Polymarket';
     const card        = el.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid         = panelId(marketId, 'price');
 
     const opened = togglePanel(card, pid, async (panel) => {
@@ -752,7 +752,7 @@ function fmtVol(v) {
   // ── 📊 VOLUME CHART ───────────────────────────────
   async function showVolumePanel(marketId, conditionId, btn) {
     const card = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'volume');
 
     togglePanel(card, pid, async (panel) => {
@@ -802,7 +802,7 @@ function fmtVol(v) {
 // ── 📖 ORDER BOOK ─────────────────────────────────
   async function showOrderbookPanel(marketId, tokenId, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'orderbook');
 
     togglePanel(card, pid, async (panel) => {
@@ -906,7 +906,7 @@ function fmtVol(v) {
   // ── 🔄 TRADES TABLE ───────────────────────────────
   async function showTradesPanel(marketId, conditionId, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'trades');
 
     togglePanel(card, pid, async (panel) => {
@@ -946,7 +946,7 @@ function fmtVol(v) {
   // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
   async function showKalshiTradesPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'trades');
  
     togglePanel(card, pid, async (panel) => {
@@ -954,7 +954,7 @@ function fmtVol(v) {
       try {
         const res = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
         const json   = await res.json();
-        const trades = (json.trades || []).filter(t => (t.amount_usd || 0) >= 1000).slice(0, 20);
+        const trades = (json.trades || []).slice(0, 20);
         const badge = document.getElementById(`${pid}-badge`);
         badge.textContent = `${trades.length} TRADES`;
         badge.style.color = 'var(--text2)';
@@ -1016,7 +1016,7 @@ function fmtVol(v) {
   // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
   async function showKalshiOrderbookPanel(marketId, ticker, btn) {
     const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const pid   = panelId(marketId, 'orderbook');
  
     togglePanel(card, pid, async (panel) => {
@@ -1136,7 +1136,7 @@ function fmtVol(v) {
 
 async function showOpenInterestPanel(marketId, conditionId, btn) {
   const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
   const pid   = panelId(marketId, 'oi');
 
   togglePanel(card, pid, async (panel) => {
@@ -1194,7 +1194,7 @@ async function showOpenInterestPanel(marketId, conditionId, btn) {
 
 async function showMarketsPanel(marketId, eventId, btn) {
   const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.textContent?.trim() || 'Market';
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
   const pid   = panelId(marketId, 'markets');
 
   togglePanel(card, pid, async (panel) => {
@@ -1364,6 +1364,18 @@ async function showMarketsPanel(marketId, eventId, btn) {
               min: minVal - Math.abs(minVal * 0.02),
               max: maxVal + Math.abs(maxVal * 0.02),
               grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: '#8a9099',
+                font: { family: "'IBM Plex Mono',monospace", size: 11 },
+                callback: v => fmt(v)
+              },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            },
+            y2: {
+              position: 'right',
+              min: minVal - Math.abs(minVal * 0.02),
+              max: maxVal + Math.abs(maxVal * 0.02),
+              grid: { drawOnChartArea: false },
               ticks: {
                 color: '#8a9099',
                 font: { family: "'IBM Plex Mono',monospace", size: 11 },
