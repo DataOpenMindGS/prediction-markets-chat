@@ -243,8 +243,7 @@
   // ── Filter population ──────────────────────────────────────────
   async function populateFilters() {
     try {
-      const res  = await fetch(ECON_URL + '?is_active=1');
-      const data = await res.json();
+      const data = await safeFetch(ECON_URL + '?is_active=1');
       if (!Array.isArray(data)) return;
       const countries = [...new Set(data.map(d => d.omd_country).filter(Boolean))].sort();
       const metrics   = [...new Set(data.map(d => d.omd_metric).filter(Boolean))].sort();
@@ -284,9 +283,8 @@
     if (active)  params.set('is_active',         active);
 
     try {
-      const res  = await fetch(ECON_URL + '?' + params);
-      if (!res.ok) throw new Error('API ' + res.status);
-      const data = await res.json();
+      const data = await safeFetch(ECON_URL + '?' + params);
+      if (!data || data.error) throw new Error(data && data.error ? data.error : 'API error');
       if (!Array.isArray(data) || !data.length) { showState('empty'); return; }
 
       // Group by country + metric + flavor + reference_year + reference_month
@@ -421,8 +419,7 @@
           const now  = Math.floor(Date.now() / 1000);
           const nowH = Math.floor(now / 3600) * 3600;
           const start = nowH - (90 * 86400);
-          const res  = await fetch(KALSHI_FC + '?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60');
-          const data = await res.json();
+          const data = await safeFetch(KALSHI_FC + '?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60');
           const hist = (data.history || []).filter(p => p.p != null);
           fc.kalshiFcHist = hist;
           fc.kalshiFc     = hist.length ? hist[hist.length-1].p : null;
@@ -433,8 +430,7 @@
       // OMD from Kalshi event
       if (row.events.kalshi) {
         try {
-          const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.kalshi.event_id));
-          const data = await res.json();
+          const data = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.kalshi.event_id));
           const hist = (data.history || []).filter(p => p.p != null);
           fc.omdKHist = hist; fc.omdKMethod = data.calc_method;
           fc.omdK     = hist.length ? hist[hist.length-1].p : null;
@@ -445,8 +441,7 @@
       // OMD from Polymarket event
       if (row.events.polymarket) {
         try {
-          const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.polymarket.event_id));
-          const data = await res.json();
+          const data = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.polymarket.event_id));
           const hist = (data.history || []).filter(p => p.p != null);
           fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method;
           fc.omdPM     = hist.length ? hist[hist.length-1].p : null;
@@ -457,8 +452,7 @@
       // OMD from ForecastEx event
       if (row.events.forecastex) {
         try {
-          const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.forecastex.event_id));
-          const data = await res.json();
+          const data = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.forecastex.event_id));
           const hist = (data.history || []).filter(p => p.p != null);
           fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method;
           fc.omdFX     = hist.length ? hist[hist.length-1].p : null;
@@ -605,6 +599,17 @@
     } else {
       sb.innerHTML = '<div class="state-icon">⚠️</div><div class="state-title">ERROR</div><div class="state-sub">' + esc(msg||'') + '</div>';
     }
+  }
+
+  // Safe fetch that always returns {history:[]} on any error
+  async function safeFetch(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return { history: [] };
+      const text = await res.text();
+      try { return JSON.parse(text); }
+      catch(e) { return { history: [] }; }
+    } catch(e) { return { history: [] }; }
   }
 
   populateFilters();
