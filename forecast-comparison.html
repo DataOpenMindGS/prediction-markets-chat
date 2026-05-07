@@ -12,16 +12,12 @@
     --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
     --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
     --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
-    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
-    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
-    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --red:#ff4d6d; --amber:#f0a500; --blue:#4da6ff;
     --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
     --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
   }
   html, body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:13px; line-height:1.5; min-height:100%; }
   #app { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
-
-  /* Nav */
   #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
   .site-nav-left { display:flex; align-items:center; gap:10px; }
   .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
@@ -31,8 +27,7 @@
   .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s; white-space:nowrap; }
   .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
   .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
-
-  /* Header */
+  .site-nav-right { display:flex; align-items:center; }
   #header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
   .header-left { display:flex; align-items:center; gap:12px; }
   .logo-box { width:28px; height:28px; background:var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; }
@@ -41,86 +36,72 @@
   .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:9px; letter-spacing:0.1em; color:var(--accent); }
   .live-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 2s infinite; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
-
-  /* Filter bar */
   #filter-bar { background:var(--bg2); border-bottom:1px solid var(--border); padding:8px 16px; flex-shrink:0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-  .filter-group { display:flex; flex-direction:column; gap:3px; min-width:140px; flex:1; max-width:200px; }
+  .filter-group { display:flex; flex-direction:column; gap:3px; min-width:130px; flex:1; max-width:190px; }
   .filter-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
-  .filter-select { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:5px 24px 5px 10px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; appearance:none; -webkit-appearance:none; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a9099' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; transition:border-color 0.15s; }
+  .filter-select { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:5px 24px 5px 10px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; appearance:none; -webkit-appearance:none; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a9099' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; }
   .filter-select:focus { border-color:rgba(0,229,160,0.35); color:var(--text); }
   .filter-actions { display:flex; gap:6px; align-items:flex-end; }
-  .btn-apply { background:var(--accent); border:none; border-radius:7px; padding:6px 14px; color:#090d12; font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.04em; cursor:pointer; transition:background 0.15s; white-space:nowrap; }
+  .btn-apply { background:var(--accent); border:none; border-radius:7px; padding:6px 14px; color:#090d12; font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.04em; cursor:pointer; white-space:nowrap; }
   .btn-apply:hover:not(:disabled) { background:var(--accent2); }
   .btn-apply:disabled { background:var(--bg4); color:var(--text3); cursor:not-allowed; }
   .btn-reset { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:6px 10px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; }
-  .btn-reset:hover { color:var(--text); }
-
-  /* Results bar */
   #results-bar { display:flex; align-items:center; padding:6px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
   #results-count { font-family:var(--mono); font-size:10px; color:var(--text3); }
-
-  /* Main scroll */
-  #main { flex:1; overflow-y:auto; padding:12px 16px; }
-
-  /* Table */
+  #main { flex:1; overflow-y:auto; padding:0; }
   .cmp-table { width:100%; border-collapse:collapse; }
   .cmp-table th { font-family:var(--mono); font-size:9px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text3); padding:6px 10px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:0; z-index:10; white-space:nowrap; }
   .cmp-table th.num { text-align:right; }
-  .cmp-table td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
-  .cmp-table tr:hover td { background:var(--bg2); }
-
-  /* Row expand area */
-  .expand-row td { padding:0; border-bottom:1px solid var(--border2); }
-  .expand-inner { padding:12px 16px; background:var(--bg3); }
-
-  /* Cell text styles */
-  .td-country { font-family:var(--mono); font-size:10px; color:var(--text2); white-space:nowrap; }
-  .td-metric { font-size:11px; color:var(--text); max-width:180px; }
-  .td-flavor { font-family:var(--mono); font-size:10px; color:var(--text3); }
-  .td-title { font-size:11px; color:var(--text2); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .cmp-table td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .cmp-table tr.data-row:hover td { background:rgba(255,255,255,0.02); }
+  .expand-row td { padding:0; border-bottom:2px solid var(--border2); }
+  .expand-inner { padding:14px 16px; background:var(--bg3); }
+  .td-dim { font-family:var(--mono); font-size:10px; color:var(--text2); white-space:nowrap; }
+  .td-title { font-size:11px; color:var(--text2); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .td-num { font-family:var(--mono); font-size:12px; font-weight:500; text-align:right; white-space:nowrap; }
   .td-num.clickable { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; color:var(--accent); }
   .td-num.clickable:hover { opacity:0.75; }
-  .td-num.loading { color:var(--text3); }
-  .td-num.na { color:var(--bg4); }
-  .td-exch { font-family:var(--mono); font-size:9px; letter-spacing:0.06em; padding:2px 5px; border-radius:3px; background:var(--bg4); color:var(--text3); border:1px solid var(--border); }
-
-  /* Spinner */
+  .td-num.na { color:var(--bg4); font-weight:400; }
+  .td-exch { font-family:var(--mono); font-size:9px; letter-spacing:0.06em; padding:2px 5px; border-radius:3px; background:var(--bg4); color:var(--text3); border:1px solid var(--border); margin-right:3px; }
   .spinner { display:inline-block; width:10px; height:10px; border:1.5px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
   @keyframes spin { to{transform:rotate(360deg)} }
-
-  /* State box */
   .state-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:12px; text-align:center; }
   .state-icon { font-size:32px; opacity:0.4; }
   .state-title { font-family:var(--mono); font-size:13px; color:var(--text2); letter-spacing:0.04em; }
   .state-sub { font-size:12px; color:var(--text3); max-width:300px; line-height:1.6; }
-
-  /* Chart panel inside expand row */
-  .chart-panel { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px; }
-  .chart-panel-title { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-transform:uppercase; margin-bottom:10px; }
-  .chart-panel canvas { max-height:160px; }
-  .chart-panels-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:10px; }
-
-  /* Shared panel styles (for inline panel) */
+  .chart-panels-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:10px; }
+  .chart-panel { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:12px; }
+  .chart-panel-title { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; color:var(--text3); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+  .chart-panel-val { font-size:13px; font-weight:500; font-family:var(--mono); }
+  /* shared panel styles needed by shared_js */
   .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; }
   .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:2px; }
-  .market-subtitle { font-size:11px; color:var(--text2); line-height:1.4; margin-bottom:6px; }
-  .panel-container { margin-top:8px; }
-  .panel-wrap { height:140px; }
+  .market-subtitle { font-size:11px; color:var(--text2); line-height:1.4; margin-bottom:6px; display:flex; align-items:center; gap:4px; }
   .panel-header { display:flex; align-items:flex-start; justify-content:space-between; padding:10px 12px 8px; border-bottom:1px solid var(--border); }
   .panel-title { font-family:var(--mono); font-size:11px; font-weight:500; color:var(--text); }
   .panel-title-sub { font-family:var(--mono); font-size:9px; color:var(--text3); margin-top:2px; }
   .panel-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 8px; border-radius:4px; }
   .panel-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0 0 0 8px; line-height:1; }
   .panel-close:hover { color:var(--text); }
-  .panel-body { padding:10px 12px; }
   .panel-loading { padding:16px; font-family:var(--mono); font-size:11px; color:var(--text3); text-align:center; }
   .panel-stats { display:flex; gap:16px; flex-wrap:wrap; padding:8px 12px; border-top:1px solid var(--border); }
+  .panel-wrap { height:140px; }
   .stat { display:flex; flex-direction:column; gap:2px; }
   .stat-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.07em; text-transform:uppercase; }
   .stat-value { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text); }
   .stat-value.up { color:var(--accent); }
   .stat-value.down { color:var(--red); }
+  .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); }
+  .vol { font-family:var(--mono); font-size:11px; color:var(--text2); }
+  .action-btn { background:var(--bg4); border:1px solid var(--border); border-radius:6px; padding:3px 9px; font-size:11px; color:var(--text2); cursor:pointer; transition:all 0.15s; font-family:var(--mono); }
+  .action-btn:hover { border-color:rgba(0,229,160,0.4); color:var(--accent); background:var(--accent-dim); }
+  .market-actions { display:flex; gap:6px; margin-top:8px; padding-top:8px; border-top:1px solid var(--border); flex-wrap:wrap; }
+  .prob { font-family:var(--mono); font-size:17px; font-weight:500; display:inline; margin-left:16px; vertical-align:middle; }
+  .prob.high { color:var(--accent); }
+  .prob.mid { color:var(--amber); }
+  .prob.low { color:var(--red); }
+  .clickable-prob { cursor:pointer; }
+  .market-meta { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -178,7 +159,7 @@
       <div class="filter-label">Flavor</div>
       <select class="filter-select" id="f-flavor"><option value="">All Flavors</option></select>
     </div>
-    <div class="filter-group" style="max-width:130px;">
+    <div class="filter-group" style="max-width:120px;">
       <div class="filter-label">Status</div>
       <select class="filter-select" id="f-active">
         <option value="1">Active Only</option>
@@ -200,17 +181,18 @@
     <div class="state-box" id="state-box">
       <div class="state-icon">📊</div>
       <div class="state-title">SELECT FILTERS ABOVE</div>
-      <div class="state-sub">Load economic markets to compare Kalshi, Polymarket, ForecastEx and OMD-calculated forecasts side by side.</div>
+      <div class="state-sub">Compare Kalshi published forecasts against OMD-calculated forecasts from all exchanges.</div>
     </div>
-    <div id="table-wrap" style="display:none;">
+    <div id="table-wrap" style="display:none; padding:12px 16px;">
       <table class="cmp-table" id="cmp-table">
         <thead>
           <tr>
             <th>Country</th>
             <th>Metric</th>
             <th>Flavor</th>
+            <th>Period</th>
             <th>Event Title</th>
-            <th>Exchange</th>
+            <th>Exchanges</th>
             <th class="num">Kalshi Forecast</th>
             <th class="num">OMD (Kalshi)</th>
             <th class="num">OMD (Polymarket)</th>
@@ -221,29 +203,42 @@
       </table>
     </div>
   </div>
-
 </div>
 
 <script>
-  const API_BASE     = 'https://api.dataopenmind.com/public';
-  const ECON_URL     = API_BASE + '/get_economic_stats';
-  const KALSHI_FC    = API_BASE + '/get_kalshi_forecast';
-  const OMD_FC       = API_BASE + '/get_omd_forecast';
-  const OMD_PRICES   = API_BASE + '/get_daily_prices';
-  const LIVE_PRICE   = API_BASE + '/get_live_price';
-  const MKT_VOLUME   = API_BASE + '/get_market_volume';
-  const MKT_ORDERBOOK= API_BASE + '/get_market_orderbook';
-  const MKT_TRADES   = API_BASE + '/get_market_trades';
-  const MKT_OI       = API_BASE + '/get_market_openinterest';
-  const KALSHI_TRADES= API_BASE + '/get_kalshi_trades';
+  const API_BASE      = 'https://api.dataopenmind.com/public';
+  const ECON_URL      = API_BASE + '/get_economic_stats';
+  const KALSHI_FC     = API_BASE + '/get_kalshi_forecast';
+  const OMD_FC        = API_BASE + '/get_omd_forecast';
+  const OMD_PRICES    = API_BASE + '/get_daily_prices';
+  const LIVE_PRICE    = API_BASE + '/get_live_price';
+  const MKT_VOLUME    = API_BASE + '/get_market_volume';
+  const MKT_ORDERBOOK = API_BASE + '/get_market_orderbook';
+  const MKT_TRADES    = API_BASE + '/get_market_trades';
+  const MKT_OI        = API_BASE + '/get_market_openinterest';
+  const KALSHI_TRADES    = API_BASE + '/get_kalshi_trades';
   const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
-  const GET_MARKETS  = API_BASE + '/get_markets';
-  const OMD_FORECAST = API_BASE + '/get_omd_forecast';
+  const GET_MARKETS   = API_BASE + '/get_markets';
+  const OMD_FORECAST  = API_BASE + '/get_omd_forecast';
+
+  const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
   let chartInstances = {};
-  let allRows = [];   // grouped rows: { key, country, metric, flavor, events:{kalshi,polymarket,forecastex} }
-  let expandedRows = new Set();   // keys of expanded rows
-  let rowForecastData = {};       // key -> { kalshiFc, omdK, omdPM, omdFX }
+  let allRows        = [];
+  let rowForecastData = {};
+  let expandedRows   = new Set();
+
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+  function escapeHTML(s) { return esc(s); }
+  function safeKey(k) { return String(k).replace(/[^a-z0-9]/gi,'_'); }
+  function fmt4(v) { return parseFloat(Number(v).toFixed(4)).toString(); }
+  function periodLabel(row) {
+    if (!row.reference_year) return '—';
+    if (!row.reference_month) return String(row.reference_year);
+    return MONTH_NAMES[(row.reference_month - 1)] + ' ' + row.reference_year;
+  }
 
   // ── Filter population ──────────────────────────────────────────
   async function populateFilters() {
@@ -257,18 +252,17 @@
       const cSel = document.getElementById('f-country');
       const mSel = document.getElementById('f-metric');
       const fSel = document.getElementById('f-flavor');
-      countries.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
-      metrics.forEach(m   => { const o = document.createElement('option'); o.value = m; o.textContent = m; mSel.appendChild(o); });
-      flavors.forEach(f   => { const o = document.createElement('option'); o.value = f; o.textContent = f; fSel.appendChild(o); });
+      countries.forEach(c => { const o = document.createElement('option'); o.value=c; o.textContent=c; cSel.appendChild(o); });
+      metrics.forEach(m   => { const o = document.createElement('option'); o.value=m; o.textContent=m; mSel.appendChild(o); });
+      flavors.forEach(f   => { const o = document.createElement('option'); o.value=f; o.textContent=f; fSel.appendChild(o); });
     } catch(e) { console.error('Filter error:', e); }
   }
 
   function resetFilters() {
     ['f-country','f-metric','f-flavor'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('f-active').value = '1';
-    allRows = [];
-    rowForecastData = {};
-    document.getElementById('state-box').style.display = 'flex';
+    allRows = []; rowForecastData = {}; expandedRows = new Set();
+    document.getElementById('state-box').style.display  = 'flex';
     document.getElementById('table-wrap').style.display = 'none';
     document.getElementById('results-count').textContent = 'Select filters and click Load';
   }
@@ -295,17 +289,26 @@
       const data = await res.json();
       if (!Array.isArray(data) || !data.length) { showState('empty'); return; }
 
-      // Group by country + metric + flavor, collect events per exchange
+      // Group by country + metric + flavor + reference_year + reference_month
       const grouped = {};
       data.forEach(d => {
-        const key = [d.omd_country, d.omd_metric, d.omd_metric_flavor || ''].join('|||');
+        const key = [
+          d.omd_country,
+          d.omd_metric,
+          d.omd_metric_flavor || '',
+          d.reference_year    || '',
+          d.reference_month   || ''
+        ].join('|||');
+
         if (!grouped[key]) {
           grouped[key] = {
             key,
-            country:  d.omd_country,
-            metric:   d.omd_metric,
-            flavor:   d.omd_metric_flavor || '',
-            events:   { kalshi: null, polymarket: null, forecastex: null }
+            country:         d.omd_country,
+            metric:          d.omd_metric,
+            flavor:          d.omd_metric_flavor || '',
+            reference_year:  d.reference_year,
+            reference_month: d.reference_month,
+            events: { kalshi: null, polymarket: null, forecastex: null }
           };
         }
         const exch = (d.exchange || '').toLowerCase();
@@ -314,18 +317,22 @@
         if (exch === 'forecastex' && !grouped[key].events.forecastex) grouped[key].events.forecastex = d;
       });
 
-      allRows = Object.values(grouped).sort((a, b) =>
-        (a.country + a.metric + a.flavor).localeCompare(b.country + b.metric + b.flavor)
-      );
+      // Sort by country, metric, flavor, year desc, month asc
+      allRows = Object.values(grouped).sort((a, b) => {
+        const cmp = (a.country + a.metric + a.flavor).localeCompare(b.country + b.metric + b.flavor);
+        if (cmp !== 0) return cmp;
+        if ((b.reference_year || 0) !== (a.reference_year || 0)) return (b.reference_year||0) - (a.reference_year||0);
+        return (a.reference_month||0) - (b.reference_month||0);
+      });
+
       rowForecastData = {};
-      expandedRows = new Set();
+      expandedRows    = new Set();
 
       renderTable();
-      document.getElementById('results-count').textContent = allRows.length + ' rows · click a value to see time series';
+      document.getElementById('results-count').textContent = allRows.length + ' rows — click a value to see time series';
       document.getElementById('state-box').style.display  = 'none';
       document.getElementById('table-wrap').style.display = 'block';
 
-      // Lazy-load forecast values
       loadAllForecasts();
 
     } catch(e) {
@@ -340,62 +347,68 @@
     const tbody = document.getElementById('cmp-tbody');
     tbody.innerHTML = '';
     allRows.forEach(row => {
-      // Data row
-      const tr = document.createElement('tr');
-      tr.id = 'row-' + safeKey(row.key);
-      const fc = rowForecastData[row.key] || {};
+      const sk   = safeKey(row.key);
+      const fc   = rowForecastData[row.key] || {};
       const repEvt = row.events.kalshi || row.events.polymarket || row.events.forecastex;
+
+      const tr = document.createElement('tr');
+      tr.id = 'row-' + sk;
+      tr.className = 'data-row';
       tr.innerHTML =
-        '<td class="td-country">' + esc(row.country) + '</td>' +
-        '<td class="td-metric">'  + esc(row.metric)  + '</td>' +
-        '<td class="td-flavor">'  + esc(row.flavor)  + '</td>' +
-        '<td class="td-title">'   + esc(repEvt ? repEvt.event_title : '') + '</td>' +
+        '<td class="td-dim">' + esc(row.country) + '</td>' +
+        '<td class="td-dim">' + esc(row.metric)  + '</td>' +
+        '<td class="td-dim">' + esc(row.flavor)  + '</td>' +
+        '<td class="td-dim">' + esc(periodLabel(row)) + '</td>' +
+        '<td class="td-title" title="' + esc(repEvt ? repEvt.event_title : '') + '">' + esc(repEvt ? repEvt.event_title : '') + '</td>' +
         '<td>' + exchangeBadges(row.events) + '</td>' +
-        '<td class="td-num" id="fc-kalshi-' + safeKey(row.key) + '">' + fmtFcCell(fc.kalshiFc, row, 'kalshi') + '</td>' +
-        '<td class="td-num" id="fc-omdk-'   + safeKey(row.key) + '">' + fmtFcCell(fc.omdK,    row, 'omdk')   + '</td>' +
-        '<td class="td-num" id="fc-omdpm-'  + safeKey(row.key) + '">' + fmtFcCell(fc.omdPM,   row, 'omdpm')  + '</td>' +
-        '<td class="td-num" id="fc-omdfx-'  + safeKey(row.key) + '">' + fmtFcCell(fc.omdFX,   row, 'omdfx')  + '</td>';
+        '<td class="td-num" id="fc-kalshi-' + sk + '">' + spinnerCell() + '</td>' +
+        '<td class="td-num" id="fc-omdk-'   + sk + '">' + spinnerCell() + '</td>' +
+        '<td class="td-num" id="fc-omdpm-'  + sk + '">' + spinnerCell() + '</td>' +
+        '<td class="td-num" id="fc-omdfx-'  + sk + '">' + spinnerCell() + '</td>';
       tbody.appendChild(tr);
 
-      // Expand row (hidden until clicked)
+      // Expand row
       const trEx = document.createElement('tr');
-      trEx.id = 'expand-' + safeKey(row.key);
+      trEx.id = 'expand-' + sk;
       trEx.className = 'expand-row';
       trEx.style.display = 'none';
-      trEx.innerHTML = '<td colspan="9"><div class="expand-inner" id="expand-inner-' + safeKey(row.key) + '"></div></td>';
+      const tdEx = document.createElement('td');
+      tdEx.colSpan = 10;
+      const inner = document.createElement('div');
+      inner.className = 'expand-inner';
+      inner.id = 'expand-inner-' + sk;
+      tdEx.appendChild(inner);
+      trEx.appendChild(tdEx);
       tbody.appendChild(trEx);
     });
   }
 
+  function spinnerCell() { return '<span class="spinner"></span>'; }
+  function naCell()      { return '<span class="td-num na">—</span>'; }
+
   function exchangeBadges(events) {
     let out = '';
-    if (events.kalshi)     out += '<span class="td-exch" style="margin-right:3px;">KA</span>';
-    if (events.polymarket) out += '<span class="td-exch" style="margin-right:3px;">PM</span>';
+    if (events.kalshi)     out += '<span class="td-exch">KA</span>';
+    if (events.polymarket) out += '<span class="td-exch">PM</span>';
     if (events.forecastex) out += '<span class="td-exch">FX</span>';
     return out || '<span style="color:var(--text3)">—</span>';
   }
 
-  function fmtFcCell(val, row, colType) {
-    if (val === undefined) return '<span class="spinner"></span>';
-    if (val === null)      return '<span class="td-num na">—</span>';
-    const fmt = parseFloat(val.toFixed(4)).toString();
-    return '<span class="td-num clickable" onclick="toggleExpand(' + JSON.stringify(row.key) + ',' + JSON.stringify(colType) + ')">' + fmt + '</span>';
-  }
-
-  function safeKey(k) { return k.replace(/[^a-z0-9]/gi, '_'); }
-  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-  // ── Update a single cell ───────────────────────────────────────
-  function updateCell(key, colType, val) {
-    const id = 'fc-' + colType + '-' + safeKey(key);
+  function setCell(key, colType, val) {
+    const sk = safeKey(key);
+    const id = 'fc-' + colType + '-' + sk;
     const el = document.getElementById(id);
     if (!el) return;
-    const row = allRows.find(r => r.key === key);
-    if (!el) return;
-    el.outerHTML = '<td class="td-num" id="' + id + '">' + fmtFcCell(val, row, colType) + '</td>';
+    if (val === null) {
+      el.innerHTML = naCell();
+    } else {
+      const encoded = JSON.stringify(key);
+      const colEnc  = JSON.stringify(colType);
+      el.innerHTML = '<span class="td-num clickable" onclick="toggleExpand(' + encoded + ',' + colEnc + ')">' + fmt4(val) + '</span>';
+    }
   }
 
-  // ── Lazy load all forecasts ────────────────────────────────────
+  // ── Load all forecasts lazily ──────────────────────────────────
   async function loadAllForecasts() {
     for (const row of allRows) {
       if (!rowForecastData[row.key]) rowForecastData[row.key] = {};
@@ -411,138 +424,126 @@
           const res  = await fetch(KALSHI_FC + '?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60');
           const data = await res.json();
           const hist = (data.history || []).filter(p => p.p != null);
-          fc.kalshiFcHistory = hist;
-          fc.kalshiFc = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.kalshiFc = null; }
-        updateCell(row.key, 'kalshi', fc.kalshiFc);
-      } else {
-        fc.kalshiFc = null;
-        updateCell(row.key, 'kalshi', null);
-      }
+          fc.kalshiFcHist = hist;
+          fc.kalshiFc     = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.kalshiFc = null; fc.kalshiFcHist = []; }
+      } else { fc.kalshiFc = null; fc.kalshiFcHist = []; }
+      setCell(row.key, 'kalshi', fc.kalshiFc);
 
-      // OMD forecast from Kalshi event
+      // OMD from Kalshi event
       if (row.events.kalshi) {
         try {
           const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.kalshi.event_id));
           const data = await res.json();
           const hist = (data.history || []).filter(p => p.p != null);
-          fc.omdKHistory = hist; fc.omdKMethod = data.calc_method;
-          fc.omdK = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.omdK = null; }
-        updateCell(row.key, 'omdk', fc.omdK);
-      } else {
-        fc.omdK = null;
-        updateCell(row.key, 'omdk', null);
-      }
+          fc.omdKHist = hist; fc.omdKMethod = data.calc_method;
+          fc.omdK     = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.omdK = null; fc.omdKHist = []; }
+      } else { fc.omdK = null; fc.omdKHist = []; }
+      setCell(row.key, 'omdk', fc.omdK);
 
-      // OMD forecast from Polymarket event
+      // OMD from Polymarket event
       if (row.events.polymarket) {
         try {
           const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.polymarket.event_id));
           const data = await res.json();
           const hist = (data.history || []).filter(p => p.p != null);
-          fc.omdPMHistory = hist; fc.omdPMMethod = data.calc_method;
-          fc.omdPM = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.omdPM = null; }
-        updateCell(row.key, 'omdpm', fc.omdPM);
-      } else {
-        fc.omdPM = null;
-        updateCell(row.key, 'omdpm', null);
-      }
+          fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method;
+          fc.omdPM     = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.omdPM = null; fc.omdPMHist = []; }
+      } else { fc.omdPM = null; fc.omdPMHist = []; }
+      setCell(row.key, 'omdpm', fc.omdPM);
 
-      // OMD forecast from ForecastEx event
+      // OMD from ForecastEx event
       if (row.events.forecastex) {
         try {
           const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.forecastex.event_id));
           const data = await res.json();
           const hist = (data.history || []).filter(p => p.p != null);
-          fc.omdFXHistory = hist; fc.omdFXMethod = data.calc_method;
-          fc.omdFX = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.omdFX = null; }
-        updateCell(row.key, 'omdfx', fc.omdFX);
-      } else {
-        fc.omdFX = null;
-        updateCell(row.key, 'omdfx', null);
-      }
+          fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method;
+          fc.omdFX     = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.omdFX = null; fc.omdFXHist = []; }
+      } else { fc.omdFX = null; fc.omdFXHist = []; }
+      setCell(row.key, 'omdfx', fc.omdFX);
 
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 80));
     }
   }
 
-  // ── Expand/collapse row ────────────────────────────────────────
+  // ── Expand/collapse ────────────────────────────────────────────
   function toggleExpand(key, focusCol) {
-    const sk    = safeKey(key);
-    const trEx  = document.getElementById('expand-' + sk);
-    const inner = document.getElementById('expand-inner-' + sk);
-    if (!trEx || !inner) return;
+    const sk   = safeKey(key);
+    const trEx = document.getElementById('expand-' + sk);
+    if (!trEx) return;
 
     if (expandedRows.has(key)) {
-      // Collapse
       trEx.style.display = 'none';
       expandedRows.delete(key);
       return;
     }
-
     expandedRows.add(key);
     trEx.style.display = '';
-    renderExpandCharts(key, focusCol, inner);
+    renderCharts(key);
   }
 
-  function renderExpandCharts(key, focusCol, inner) {
-    const fc  = rowForecastData[key] || {};
-    const row = allRows.find(r => r.key === key);
+  function renderCharts(key) {
+    const sk    = safeKey(key);
+    const inner = document.getElementById('expand-inner-' + sk);
+    const fc    = rowForecastData[key] || {};
+    const row   = allRows.find(r => r.key === key);
+    if (!inner) return;
 
-    const charts = [
-      { id: 'kalshi',  label: 'Kalshi Published Forecast', hist: fc.kalshiFcHistory,  color: '#4da6ff',  method: null },
-      { id: 'omdk',    label: 'OMD Forecast (Kalshi)',     hist: fc.omdKHistory,       color: '#00e5a0',  method: fc.omdKMethod },
-      { id: 'omdpm',   label: 'OMD Forecast (Polymarket)', hist: fc.omdPMHistory,      color: '#f0a500',  method: fc.omdPMMethod },
-      { id: 'omdfx',   label: 'OMD Forecast (ForecastEx)', hist: fc.omdFXHistory,      color: '#a78bfa',  method: fc.omdFXMethod },
-    ].filter(c => c.hist && c.hist.length);
+    const series = [
+      { label: 'Kalshi Published',    hist: fc.kalshiFcHist, color: '#4da6ff', method: null },
+      { label: 'OMD (Kalshi)',         hist: fc.omdKHist,     color: '#00e5a0', method: fc.omdKMethod },
+      { label: 'OMD (Polymarket)',     hist: fc.omdPMHist,    color: '#f0a500', method: fc.omdPMMethod },
+      { label: 'OMD (ForecastEx)',     hist: fc.omdFXHist,    color: '#a78bfa', method: fc.omdFXMethod },
+    ].filter(s => s.hist && s.hist.length);
 
-    if (!charts.length) {
-      inner.innerHTML = '<div style="padding:12px;font-family:var(--mono);font-size:11px;color:var(--text3);">No forecast history available for this row.</div>';
+    if (!series.length) {
+      inner.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--text3);">No forecast history available.</div>';
       return;
     }
 
-    inner.innerHTML = '<div class="chart-panels-grid" id="charts-' + safeKey(key) + '"></div>';
-    const grid = document.getElementById('charts-' + safeKey(key));
+    inner.innerHTML = '<div class="chart-panels-grid" id="cpg-' + sk + '"></div>';
+    const grid = document.getElementById('cpg-' + sk);
 
-    charts.forEach(c => {
-      const canvasId = 'canvas-' + safeKey(key) + '-' + c.id;
-      const panel = document.createElement('div');
-      panel.className = 'chart-panel';
-      const latestVal = c.hist[c.hist.length-1].p;
-      const fmt = v => parseFloat(v.toFixed(4)).toString();
-      panel.innerHTML =
-        '<div class="chart-panel-title">' + c.label + (c.method ? ' · <span style="color:var(--text3)">' + c.method + '</span>' : '') + '' +
-        ' &nbsp;<span style="color:' + c.color + ';font-size:12px;font-weight:500;">' + fmt(latestVal) + '</span></div>' +
-        '<div class="chart-panel"><canvas id="' + canvasId + '" style="max-height:140px;"></canvas></div>';
-      grid.appendChild(panel);
+    series.forEach(s => {
+      const cid = 'cv-' + sk + '-' + s.label.replace(/\W/g,'');
+      const latest = s.hist[s.hist.length-1].p;
+      const div = document.createElement('div');
+      div.className = 'chart-panel';
+      div.innerHTML =
+        '<div class="chart-panel-title">' +
+          '<span>' + esc(s.label) + (s.method ? ' <span style="color:var(--bg4);font-weight:400">· ' + esc(s.method) + '</span>' : '') + '</span>' +
+          '<span class="chart-panel-val" style="color:' + s.color + '">' + fmt4(latest) + '</span>' +
+        '</div>' +
+        '<div style="height:130px;"><canvas id="' + cid + '"></canvas></div>';
+      grid.appendChild(div);
 
-      // Draw chart after DOM insertion
       setTimeout(() => {
-        const el = document.getElementById(canvasId);
+        const el = document.getElementById(cid);
         if (!el) return;
-        if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
-        const labels = c.hist.map(d => {
+        if (chartInstances[cid]) { chartInstances[cid].destroy(); }
+        const labels = s.hist.map(d => {
           const dt = new Date(d.t * 1000);
-          return (dt.getMonth()+1) + '/' + dt.getDate();
+          return (dt.getMonth()+1) + '/' + dt.getDate() + '/' + String(dt.getFullYear()).slice(2);
         });
-        const values = c.hist.map(d => d.p);
+        const values = s.hist.map(d => d.p);
         const minV = Math.min(...values);
         const maxV = Math.max(...values);
-        chartInstances[canvasId] = new Chart(el, {
+        chartInstances[cid] = new Chart(el, {
           type: 'line',
           data: {
             labels,
             datasets: [{
               data: values,
-              borderColor: c.color,
+              borderColor: s.color,
               borderWidth: 1.5,
               pointRadius: 0,
               pointHoverRadius: 3,
               fill: true,
-              backgroundColor: c.color + '22',
+              backgroundColor: s.color + '22',
               tension: 0.3
             }]
           },
@@ -561,7 +562,7 @@
                 bodyColor: '#f0f2f5',
                 titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
                 bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
-                callbacks: { label: i => ' ' + fmt(i.raw) }
+                callbacks: { label: i => ' ' + fmt4(i.raw) }
               }
             },
             scales: {
@@ -574,7 +575,15 @@
                 min: minV - Math.abs(minV * 0.02),
                 max: maxV + Math.abs(maxV * 0.02),
                 grid: { color: 'rgba(255,255,255,0.04)' },
-                ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 10 }, callback: v => fmt(v) },
+                ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 10 }, callback: v => fmt4(v) },
+                border: { color: 'rgba(255,255,255,0.07)' }
+              },
+              y2: {
+                position: 'right',
+                min: minV - Math.abs(minV * 0.02),
+                max: maxV + Math.abs(maxV * 0.02),
+                grid: { drawOnChartArea: false },
+                ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 10 }, callback: v => fmt4(v) },
                 border: { color: 'rgba(255,255,255,0.07)' }
               }
             }
@@ -584,26 +593,24 @@
     });
   }
 
-  // ── State helpers ──────────────────────────────────────────────
+  // ── State ──────────────────────────────────────────────────────
   function showState(state, msg) {
     const sb = document.getElementById('state-box');
     document.getElementById('table-wrap').style.display = 'none';
     sb.style.display = 'flex';
     if (state === 'loading') {
-      sb.innerHTML = '<div style="width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;"></div><div class="state-title">LOADING</div>';
+      sb.innerHTML = '<div class="spinner" style="width:20px;height:20px;border-width:2px;"></div><div class="state-title">LOADING</div>';
     } else if (state === 'empty') {
       sb.innerHTML = '<div class="state-icon">📭</div><div class="state-title">NO DATA FOUND</div><div class="state-sub">Try adjusting your filters.</div>';
-    } else if (state === 'error') {
+    } else {
       sb.innerHTML = '<div class="state-icon">⚠️</div><div class="state-title">ERROR</div><div class="state-sub">' + esc(msg||'') + '</div>';
     }
   }
 
-  function escapeHTML(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
-
   populateFilters();
 
+  // ── Shared panel/chart helpers (from text-search) ──────────────
 
-  // ── Shared panel/chart helpers ──────────────────────
   function fmtVol(v) {
     if (v == null) return 'N/A';
     if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
@@ -1483,8 +1490,9 @@ async function showMarketsPanel(marketId, eventId, btn) {
   });
 }
 
-</script>
 
+
+</script>
 <div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none;">Info@OpenMindData.io</a></div>
 <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;&middot;&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none;">openminddata.io</a></div>
 </body>
