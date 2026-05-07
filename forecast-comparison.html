@@ -607,9 +607,10 @@
       const res = await fetch(url);
       if (!res.ok) return { history: [] };
       const text = await res.text();
+      if (!text || !text.trim()) return { history: [] };
       try { return JSON.parse(text); }
-      catch(e) { return { history: [] }; }
-    } catch(e) { return { history: [] }; }
+      catch(e) { console.warn('JSON parse error for', url, e.message); return { history: [] }; }
+    } catch(e) { console.warn('Fetch error for', url, e.message); return { history: [] }; }
   }
 
   populateFilters();
