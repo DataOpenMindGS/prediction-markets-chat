@@ -1,0 +1,1491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forecast Comparison – Prediction Markets Data</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+  }
+  html, body { background:var(--bg); color:var(--text); font-family:var(--sans); font-size:13px; line-height:1.5; min-height:100%; }
+  #app { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+
+  /* Nav */
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+
+  /* Header */
+  #header { display:flex; align-items:center; justify-content:space-between; padding:10px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; }
+  .header-left { display:flex; align-items:center; gap:12px; }
+  .logo-box { width:28px; height:28px; background:var(--accent); border-radius:6px; display:flex; align-items:center; justify-content:center; }
+  .header-title { font-family:var(--mono); font-size:13px; font-weight:500; letter-spacing:0.06em; }
+  .header-sub { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; margin-top:1px; }
+  .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:9px; letter-spacing:0.1em; color:var(--accent); }
+  .live-dot { width:6px; height:6px; border-radius:50%; background:var(--accent); animation:pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* Filter bar */
+  #filter-bar { background:var(--bg2); border-bottom:1px solid var(--border); padding:8px 16px; flex-shrink:0; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .filter-group { display:flex; flex-direction:column; gap:3px; min-width:140px; flex:1; max-width:200px; }
+  .filter-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
+  .filter-select { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:5px 24px 5px 10px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; appearance:none; -webkit-appearance:none; outline:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238a9099' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right 8px center; transition:border-color 0.15s; }
+  .filter-select:focus { border-color:rgba(0,229,160,0.35); color:var(--text); }
+  .filter-actions { display:flex; gap:6px; align-items:flex-end; }
+  .btn-apply { background:var(--accent); border:none; border-radius:7px; padding:6px 14px; color:#090d12; font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.04em; cursor:pointer; transition:background 0.15s; white-space:nowrap; }
+  .btn-apply:hover:not(:disabled) { background:var(--accent2); }
+  .btn-apply:disabled { background:var(--bg4); color:var(--text3); cursor:not-allowed; }
+  .btn-reset { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:6px 10px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; }
+  .btn-reset:hover { color:var(--text); }
+
+  /* Results bar */
+  #results-bar { display:flex; align-items:center; padding:6px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  #results-count { font-family:var(--mono); font-size:10px; color:var(--text3); }
+
+  /* Main scroll */
+  #main { flex:1; overflow-y:auto; padding:12px 16px; }
+
+  /* Table */
+  .cmp-table { width:100%; border-collapse:collapse; }
+  .cmp-table th { font-family:var(--mono); font-size:9px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text3); padding:6px 10px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:0; z-index:10; white-space:nowrap; }
+  .cmp-table th.num { text-align:right; }
+  .cmp-table td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  .cmp-table tr:hover td { background:var(--bg2); }
+
+  /* Row expand area */
+  .expand-row td { padding:0; border-bottom:1px solid var(--border2); }
+  .expand-inner { padding:12px 16px; background:var(--bg3); }
+
+  /* Cell text styles */
+  .td-country { font-family:var(--mono); font-size:10px; color:var(--text2); white-space:nowrap; }
+  .td-metric { font-size:11px; color:var(--text); max-width:180px; }
+  .td-flavor { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .td-title { font-size:11px; color:var(--text2); max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .td-num { font-family:var(--mono); font-size:12px; font-weight:500; text-align:right; white-space:nowrap; }
+  .td-num.clickable { cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; color:var(--accent); }
+  .td-num.clickable:hover { opacity:0.75; }
+  .td-num.loading { color:var(--text3); }
+  .td-num.na { color:var(--bg4); }
+  .td-exch { font-family:var(--mono); font-size:9px; letter-spacing:0.06em; padding:2px 5px; border-radius:3px; background:var(--bg4); color:var(--text3); border:1px solid var(--border); }
+
+  /* Spinner */
+  .spinner { display:inline-block; width:10px; height:10px; border:1.5px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to{transform:rotate(360deg)} }
+
+  /* State box */
+  .state-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:12px; text-align:center; }
+  .state-icon { font-size:32px; opacity:0.4; }
+  .state-title { font-family:var(--mono); font-size:13px; color:var(--text2); letter-spacing:0.04em; }
+  .state-sub { font-size:12px; color:var(--text3); max-width:300px; line-height:1.6; }
+
+  /* Chart panel inside expand row */
+  .chart-panel { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:10px; }
+  .chart-panel-title { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-transform:uppercase; margin-bottom:10px; }
+  .chart-panel canvas { max-height:160px; }
+  .chart-panels-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(320px, 1fr)); gap:10px; }
+
+  /* Shared panel styles (for inline panel) */
+  .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; }
+  .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:2px; }
+  .market-subtitle { font-size:11px; color:var(--text2); line-height:1.4; margin-bottom:6px; }
+  .panel-container { margin-top:8px; }
+  .panel-wrap { height:140px; }
+  .panel-header { display:flex; align-items:flex-start; justify-content:space-between; padding:10px 12px 8px; border-bottom:1px solid var(--border); }
+  .panel-title { font-family:var(--mono); font-size:11px; font-weight:500; color:var(--text); }
+  .panel-title-sub { font-family:var(--mono); font-size:9px; color:var(--text3); margin-top:2px; }
+  .panel-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 8px; border-radius:4px; }
+  .panel-close { background:none; border:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0 0 0 8px; line-height:1; }
+  .panel-close:hover { color:var(--text); }
+  .panel-body { padding:10px 12px; }
+  .panel-loading { padding:16px; font-family:var(--mono); font-size:11px; color:var(--text3); text-align:center; }
+  .panel-stats { display:flex; gap:16px; flex-wrap:wrap; padding:8px 12px; border-top:1px solid var(--border); }
+  .stat { display:flex; flex-direction:column; gap:2px; }
+  .stat-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.07em; text-transform:uppercase; }
+  .stat-value { font-family:var(--mono); font-size:13px; font-weight:500; color:var(--text); }
+  .stat-value.up { color:var(--accent); }
+  .stat-value.down { color:var(--red); }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="site-nav">
+    <div class="site-nav-left">
+      <div class="site-nav-logo">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+      <div class="site-nav-divider"></div>
+      <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="text-search.html">TEXT SEARCH</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="economic-stats.html">ECONOMIC STATS</a>
+        <a href="forecast-comparison.html" class="active">FORECAST COMPARE</a>
+        <a href="analysis.html">ANALYSIS</a>
+      </div>
+    </div>
+    <div class="site-nav-right"></div>
+  </div>
+
+  <div id="header">
+    <div class="header-left">
+      <div class="logo-box">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">FORECAST COMPARISON</div>
+        <div class="header-sub">KALSHI vs OMD CALCULATED FORECASTS</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+
+  <div id="filter-bar">
+    <div class="filter-group">
+      <div class="filter-label">Country</div>
+      <select class="filter-select" id="f-country"><option value="">All Countries</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Metric</div>
+      <select class="filter-select" id="f-metric"><option value="">All Metrics</option></select>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Flavor</div>
+      <select class="filter-select" id="f-flavor"><option value="">All Flavors</option></select>
+    </div>
+    <div class="filter-group" style="max-width:130px;">
+      <div class="filter-label">Status</div>
+      <select class="filter-select" id="f-active">
+        <option value="1">Active Only</option>
+        <option value="">All</option>
+        <option value="0">Closed Only</option>
+      </select>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-apply" id="btn-apply" onclick="loadData()">Load</button>
+      <button class="btn-reset" onclick="resetFilters()">Reset</button>
+    </div>
+  </div>
+
+  <div id="results-bar">
+    <div id="results-count" style="color:var(--text3);">Select filters and click Load</div>
+  </div>
+
+  <div id="main">
+    <div class="state-box" id="state-box">
+      <div class="state-icon">📊</div>
+      <div class="state-title">SELECT FILTERS ABOVE</div>
+      <div class="state-sub">Load economic markets to compare Kalshi, Polymarket, ForecastEx and OMD-calculated forecasts side by side.</div>
+    </div>
+    <div id="table-wrap" style="display:none;">
+      <table class="cmp-table" id="cmp-table">
+        <thead>
+          <tr>
+            <th>Country</th>
+            <th>Metric</th>
+            <th>Flavor</th>
+            <th>Event Title</th>
+            <th>Exchange</th>
+            <th class="num">Kalshi Forecast</th>
+            <th class="num">OMD (Kalshi)</th>
+            <th class="num">OMD (Polymarket)</th>
+            <th class="num">OMD (ForecastEx)</th>
+          </tr>
+        </thead>
+        <tbody id="cmp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API_BASE     = 'https://api.dataopenmind.com/public';
+  const ECON_URL     = API_BASE + '/get_economic_stats';
+  const KALSHI_FC    = API_BASE + '/get_kalshi_forecast';
+  const OMD_FC       = API_BASE + '/get_omd_forecast';
+  const OMD_PRICES   = API_BASE + '/get_daily_prices';
+  const LIVE_PRICE   = API_BASE + '/get_live_price';
+  const MKT_VOLUME   = API_BASE + '/get_market_volume';
+  const MKT_ORDERBOOK= API_BASE + '/get_market_orderbook';
+  const MKT_TRADES   = API_BASE + '/get_market_trades';
+  const MKT_OI       = API_BASE + '/get_market_openinterest';
+  const KALSHI_TRADES= API_BASE + '/get_kalshi_trades';
+  const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
+  const GET_MARKETS  = API_BASE + '/get_markets';
+  const OMD_FORECAST = API_BASE + '/get_omd_forecast';
+
+  let chartInstances = {};
+  let allRows = [];   // grouped rows: { key, country, metric, flavor, events:{kalshi,polymarket,forecastex} }
+  let expandedRows = new Set();   // keys of expanded rows
+  let rowForecastData = {};       // key -> { kalshiFc, omdK, omdPM, omdFX }
+
+  // ── Filter population ──────────────────────────────────────────
+  async function populateFilters() {
+    try {
+      const res  = await fetch(ECON_URL + '?is_active=1');
+      const data = await res.json();
+      if (!Array.isArray(data)) return;
+      const countries = [...new Set(data.map(d => d.omd_country).filter(Boolean))].sort();
+      const metrics   = [...new Set(data.map(d => d.omd_metric).filter(Boolean))].sort();
+      const flavors   = [...new Set(data.map(d => d.omd_metric_flavor).filter(Boolean))].sort();
+      const cSel = document.getElementById('f-country');
+      const mSel = document.getElementById('f-metric');
+      const fSel = document.getElementById('f-flavor');
+      countries.forEach(c => { const o = document.createElement('option'); o.value = c; o.textContent = c; cSel.appendChild(o); });
+      metrics.forEach(m   => { const o = document.createElement('option'); o.value = m; o.textContent = m; mSel.appendChild(o); });
+      flavors.forEach(f   => { const o = document.createElement('option'); o.value = f; o.textContent = f; fSel.appendChild(o); });
+    } catch(e) { console.error('Filter error:', e); }
+  }
+
+  function resetFilters() {
+    ['f-country','f-metric','f-flavor'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('f-active').value = '1';
+    allRows = [];
+    rowForecastData = {};
+    document.getElementById('state-box').style.display = 'flex';
+    document.getElementById('table-wrap').style.display = 'none';
+    document.getElementById('results-count').textContent = 'Select filters and click Load';
+  }
+
+  // ── Load data ──────────────────────────────────────────────────
+  async function loadData() {
+    const btn = document.getElementById('btn-apply');
+    btn.disabled = true; btn.textContent = 'Loading...';
+    showState('loading');
+
+    const params = new URLSearchParams();
+    const country = document.getElementById('f-country').value;
+    const metric  = document.getElementById('f-metric').value;
+    const flavor  = document.getElementById('f-flavor').value;
+    const active  = document.getElementById('f-active').value;
+    if (country) params.set('omd_country',      country);
+    if (metric)  params.set('omd_metric',        metric);
+    if (flavor)  params.set('omd_metric_flavor', flavor);
+    if (active)  params.set('is_active',         active);
+
+    try {
+      const res  = await fetch(ECON_URL + '?' + params);
+      if (!res.ok) throw new Error('API ' + res.status);
+      const data = await res.json();
+      if (!Array.isArray(data) || !data.length) { showState('empty'); return; }
+
+      // Group by country + metric + flavor, collect events per exchange
+      const grouped = {};
+      data.forEach(d => {
+        const key = [d.omd_country, d.omd_metric, d.omd_metric_flavor || ''].join('|||');
+        if (!grouped[key]) {
+          grouped[key] = {
+            key,
+            country:  d.omd_country,
+            metric:   d.omd_metric,
+            flavor:   d.omd_metric_flavor || '',
+            events:   { kalshi: null, polymarket: null, forecastex: null }
+          };
+        }
+        const exch = (d.exchange || '').toLowerCase();
+        if (exch === 'kalshi'     && !grouped[key].events.kalshi)     grouped[key].events.kalshi     = d;
+        if (exch === 'polymarket' && !grouped[key].events.polymarket) grouped[key].events.polymarket = d;
+        if (exch === 'forecastex' && !grouped[key].events.forecastex) grouped[key].events.forecastex = d;
+      });
+
+      allRows = Object.values(grouped).sort((a, b) =>
+        (a.country + a.metric + a.flavor).localeCompare(b.country + b.metric + b.flavor)
+      );
+      rowForecastData = {};
+      expandedRows = new Set();
+
+      renderTable();
+      document.getElementById('results-count').textContent = allRows.length + ' rows · click a value to see time series';
+      document.getElementById('state-box').style.display  = 'none';
+      document.getElementById('table-wrap').style.display = 'block';
+
+      // Lazy-load forecast values
+      loadAllForecasts();
+
+    } catch(e) {
+      showState('error', e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = 'Load';
+    }
+  }
+
+  // ── Render table ───────────────────────────────────────────────
+  function renderTable() {
+    const tbody = document.getElementById('cmp-tbody');
+    tbody.innerHTML = '';
+    allRows.forEach(row => {
+      // Data row
+      const tr = document.createElement('tr');
+      tr.id = 'row-' + safeKey(row.key);
+      const fc = rowForecastData[row.key] || {};
+      const repEvt = row.events.kalshi || row.events.polymarket || row.events.forecastex;
+      tr.innerHTML =
+        '<td class="td-country">' + esc(row.country) + '</td>' +
+        '<td class="td-metric">'  + esc(row.metric)  + '</td>' +
+        '<td class="td-flavor">'  + esc(row.flavor)  + '</td>' +
+        '<td class="td-title">'   + esc(repEvt ? repEvt.event_title : '') + '</td>' +
+        '<td>' + exchangeBadges(row.events) + '</td>' +
+        '<td class="td-num" id="fc-kalshi-' + safeKey(row.key) + '">' + fmtFcCell(fc.kalshiFc, row, 'kalshi') + '</td>' +
+        '<td class="td-num" id="fc-omdk-'   + safeKey(row.key) + '">' + fmtFcCell(fc.omdK,    row, 'omdk')   + '</td>' +
+        '<td class="td-num" id="fc-omdpm-'  + safeKey(row.key) + '">' + fmtFcCell(fc.omdPM,   row, 'omdpm')  + '</td>' +
+        '<td class="td-num" id="fc-omdfx-'  + safeKey(row.key) + '">' + fmtFcCell(fc.omdFX,   row, 'omdfx')  + '</td>';
+      tbody.appendChild(tr);
+
+      // Expand row (hidden until clicked)
+      const trEx = document.createElement('tr');
+      trEx.id = 'expand-' + safeKey(row.key);
+      trEx.className = 'expand-row';
+      trEx.style.display = 'none';
+      trEx.innerHTML = '<td colspan="9"><div class="expand-inner" id="expand-inner-' + safeKey(row.key) + '"></div></td>';
+      tbody.appendChild(trEx);
+    });
+  }
+
+  function exchangeBadges(events) {
+    let out = '';
+    if (events.kalshi)     out += '<span class="td-exch" style="margin-right:3px;">KA</span>';
+    if (events.polymarket) out += '<span class="td-exch" style="margin-right:3px;">PM</span>';
+    if (events.forecastex) out += '<span class="td-exch">FX</span>';
+    return out || '<span style="color:var(--text3)">—</span>';
+  }
+
+  function fmtFcCell(val, row, colType) {
+    if (val === undefined) return '<span class="spinner"></span>';
+    if (val === null)      return '<span class="td-num na">—</span>';
+    const fmt = parseFloat(val.toFixed(4)).toString();
+    return '<span class="td-num clickable" onclick="toggleExpand(' + JSON.stringify(row.key) + ',' + JSON.stringify(colType) + ')">' + fmt + '</span>';
+  }
+
+  function safeKey(k) { return k.replace(/[^a-z0-9]/gi, '_'); }
+  function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  // ── Update a single cell ───────────────────────────────────────
+  function updateCell(key, colType, val) {
+    const id = 'fc-' + colType + '-' + safeKey(key);
+    const el = document.getElementById(id);
+    if (!el) return;
+    const row = allRows.find(r => r.key === key);
+    if (!el) return;
+    el.outerHTML = '<td class="td-num" id="' + id + '">' + fmtFcCell(val, row, colType) + '</td>';
+  }
+
+  // ── Lazy load all forecasts ────────────────────────────────────
+  async function loadAllForecasts() {
+    for (const row of allRows) {
+      if (!rowForecastData[row.key]) rowForecastData[row.key] = {};
+      const fc = rowForecastData[row.key];
+
+      // Kalshi published forecast
+      if (row.events.kalshi) {
+        const rawId = row.events.kalshi.event_id.replace(/^ka_/i, '');
+        try {
+          const now  = Math.floor(Date.now() / 1000);
+          const nowH = Math.floor(now / 3600) * 3600;
+          const start = nowH - (90 * 86400);
+          const res  = await fetch(KALSHI_FC + '?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60');
+          const data = await res.json();
+          const hist = (data.history || []).filter(p => p.p != null);
+          fc.kalshiFcHistory = hist;
+          fc.kalshiFc = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.kalshiFc = null; }
+        updateCell(row.key, 'kalshi', fc.kalshiFc);
+      } else {
+        fc.kalshiFc = null;
+        updateCell(row.key, 'kalshi', null);
+      }
+
+      // OMD forecast from Kalshi event
+      if (row.events.kalshi) {
+        try {
+          const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.kalshi.event_id));
+          const data = await res.json();
+          const hist = (data.history || []).filter(p => p.p != null);
+          fc.omdKHistory = hist; fc.omdKMethod = data.calc_method;
+          fc.omdK = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.omdK = null; }
+        updateCell(row.key, 'omdk', fc.omdK);
+      } else {
+        fc.omdK = null;
+        updateCell(row.key, 'omdk', null);
+      }
+
+      // OMD forecast from Polymarket event
+      if (row.events.polymarket) {
+        try {
+          const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.polymarket.event_id));
+          const data = await res.json();
+          const hist = (data.history || []).filter(p => p.p != null);
+          fc.omdPMHistory = hist; fc.omdPMMethod = data.calc_method;
+          fc.omdPM = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.omdPM = null; }
+        updateCell(row.key, 'omdpm', fc.omdPM);
+      } else {
+        fc.omdPM = null;
+        updateCell(row.key, 'omdpm', null);
+      }
+
+      // OMD forecast from ForecastEx event
+      if (row.events.forecastex) {
+        try {
+          const res  = await fetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.forecastex.event_id));
+          const data = await res.json();
+          const hist = (data.history || []).filter(p => p.p != null);
+          fc.omdFXHistory = hist; fc.omdFXMethod = data.calc_method;
+          fc.omdFX = hist.length ? hist[hist.length-1].p : null;
+        } catch(e) { fc.omdFX = null; }
+        updateCell(row.key, 'omdfx', fc.omdFX);
+      } else {
+        fc.omdFX = null;
+        updateCell(row.key, 'omdfx', null);
+      }
+
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+
+  // ── Expand/collapse row ────────────────────────────────────────
+  function toggleExpand(key, focusCol) {
+    const sk    = safeKey(key);
+    const trEx  = document.getElementById('expand-' + sk);
+    const inner = document.getElementById('expand-inner-' + sk);
+    if (!trEx || !inner) return;
+
+    if (expandedRows.has(key)) {
+      // Collapse
+      trEx.style.display = 'none';
+      expandedRows.delete(key);
+      return;
+    }
+
+    expandedRows.add(key);
+    trEx.style.display = '';
+    renderExpandCharts(key, focusCol, inner);
+  }
+
+  function renderExpandCharts(key, focusCol, inner) {
+    const fc  = rowForecastData[key] || {};
+    const row = allRows.find(r => r.key === key);
+
+    const charts = [
+      { id: 'kalshi',  label: 'Kalshi Published Forecast', hist: fc.kalshiFcHistory,  color: '#4da6ff',  method: null },
+      { id: 'omdk',    label: 'OMD Forecast (Kalshi)',     hist: fc.omdKHistory,       color: '#00e5a0',  method: fc.omdKMethod },
+      { id: 'omdpm',   label: 'OMD Forecast (Polymarket)', hist: fc.omdPMHistory,      color: '#f0a500',  method: fc.omdPMMethod },
+      { id: 'omdfx',   label: 'OMD Forecast (ForecastEx)', hist: fc.omdFXHistory,      color: '#a78bfa',  method: fc.omdFXMethod },
+    ].filter(c => c.hist && c.hist.length);
+
+    if (!charts.length) {
+      inner.innerHTML = '<div style="padding:12px;font-family:var(--mono);font-size:11px;color:var(--text3);">No forecast history available for this row.</div>';
+      return;
+    }
+
+    inner.innerHTML = '<div class="chart-panels-grid" id="charts-' + safeKey(key) + '"></div>';
+    const grid = document.getElementById('charts-' + safeKey(key));
+
+    charts.forEach(c => {
+      const canvasId = 'canvas-' + safeKey(key) + '-' + c.id;
+      const panel = document.createElement('div');
+      panel.className = 'chart-panel';
+      const latestVal = c.hist[c.hist.length-1].p;
+      const fmt = v => parseFloat(v.toFixed(4)).toString();
+      panel.innerHTML =
+        '<div class="chart-panel-title">' + c.label + (c.method ? ' · <span style="color:var(--text3)">' + c.method + '</span>' : '') + '' +
+        ' &nbsp;<span style="color:' + c.color + ';font-size:12px;font-weight:500;">' + fmt(latestVal) + '</span></div>' +
+        '<div class="chart-panel"><canvas id="' + canvasId + '" style="max-height:140px;"></canvas></div>';
+      grid.appendChild(panel);
+
+      // Draw chart after DOM insertion
+      setTimeout(() => {
+        const el = document.getElementById(canvasId);
+        if (!el) return;
+        if (chartInstances[canvasId]) { chartInstances[canvasId].destroy(); }
+        const labels = c.hist.map(d => {
+          const dt = new Date(d.t * 1000);
+          return (dt.getMonth()+1) + '/' + dt.getDate();
+        });
+        const values = c.hist.map(d => d.p);
+        const minV = Math.min(...values);
+        const maxV = Math.max(...values);
+        chartInstances[canvasId] = new Chart(el, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              data: values,
+              borderColor: c.color,
+              borderWidth: 1.5,
+              pointRadius: 0,
+              pointHoverRadius: 3,
+              fill: true,
+              backgroundColor: c.color + '22',
+              tension: 0.3
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: { duration: 200 },
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24',
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                titleColor: '#8a9099',
+                bodyColor: '#f0f2f5',
+                titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+                bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
+                callbacks: { label: i => ' ' + fmt(i.raw) }
+              }
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 10 }, maxTicksLimit: 8, maxRotation: 0 },
+                border: { color: 'rgba(255,255,255,0.07)' }
+              },
+              y: {
+                min: minV - Math.abs(minV * 0.02),
+                max: maxV + Math.abs(maxV * 0.02),
+                grid: { color: 'rgba(255,255,255,0.04)' },
+                ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 10 }, callback: v => fmt(v) },
+                border: { color: 'rgba(255,255,255,0.07)' }
+              }
+            }
+          }
+        });
+      }, 50);
+    });
+  }
+
+  // ── State helpers ──────────────────────────────────────────────
+  function showState(state, msg) {
+    const sb = document.getElementById('state-box');
+    document.getElementById('table-wrap').style.display = 'none';
+    sb.style.display = 'flex';
+    if (state === 'loading') {
+      sb.innerHTML = '<div style="width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin 0.7s linear infinite;"></div><div class="state-title">LOADING</div>';
+    } else if (state === 'empty') {
+      sb.innerHTML = '<div class="state-icon">📭</div><div class="state-title">NO DATA FOUND</div><div class="state-sub">Try adjusting your filters.</div>';
+    } else if (state === 'error') {
+      sb.innerHTML = '<div class="state-icon">⚠️</div><div class="state-title">ERROR</div><div class="state-sub">' + esc(msg||'') + '</div>';
+    }
+  }
+
+  function escapeHTML(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  populateFilters();
+
+
+  // ── Shared panel/chart helpers ──────────────────────
+  function fmtVol(v) {
+    if (v == null) return 'N/A';
+    if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
+    if (v >= 1e3) return '$' + (v/1e3).toFixed(0) + 'K';
+    return '$' + Math.round(v);
+  }
+  function fmtDate(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
+  }
+  function fmtTime(ts) {
+    const d = new Date(ts * 1000);
+    return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
+  }
+ function safeHTML(id, html) { const el=document.getElementById(id); if(el) el.innerHTML=html; }
+ function safeBadge(id, text, color, bg, border) {
+  const el=document.getElementById(id); if(!el) return;
+  el.textContent=text; el.style.color=color; el.style.background=bg; el.style.border=border;
+ }
+ 
+  // ── Message rendering ──────────────────────────────
+  function addUserMsg(text) {
+    hideWelcome();
+    const row = document.createElement('div');
+    row.className = 'msg user';
+    row.innerHTML = `<div class="avatar">YOU</div><div class="bubble">${escapeHTML(text)}</div>`;
+    messagesEl.appendChild(row);
+    scrollToEl(row);
+  }
+  function addTyping() {
+    hideWelcome();
+    const row = document.createElement('div');
+    row.className = 'msg bot'; row.id = 'typing-row';
+    row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    messagesEl.appendChild(row);
+  }
+  function removeTyping() { const el = document.getElementById('typing-row'); if (el) el.remove(); }
+  function addBotMsg(html) {
+    const row = document.createElement('div');
+    row.className = 'msg bot';
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar'; avatar.textContent = 'AI';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = isHTML(html) ? html : `<p>${escapeHTML(html)}</p>`;
+    row.appendChild(avatar); row.appendChild(bubble);
+    messagesEl.appendChild(row);
+    // Inject action buttons into market cards
+    injectActionButtons(bubble);
+    scrollToEl(row);
+    return bubble;
+  }
+  function addErrorMsg(msg) {
+    const row = document.createElement('div');
+    row.className = 'msg bot';
+    row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="error-msg">${escapeHTML(msg)}</div></div>`;
+    messagesEl.appendChild(row); scrollToEl(row);
+  }
+  function setLoading(val) { busy = val; sendBtn.disabled = val; }
+
+  // ── Inject action buttons into market cards ────────
+  function injectActionButtons(bubble) {
+    bubble.querySelectorAll('.market-card').forEach(card => {
+      const probEl      = card.querySelector('.clickable-prob');
+      if (!probEl) return;
+      const marketId    = probEl.dataset.marketId;
+      const tokenId     = probEl.dataset.tokenId;
+      const conditionId = probEl.dataset.conditionId;
+      const eventId     = probEl.dataset.eventId;
+      const exchange    = (probEl.dataset.exchange || '').toLowerCase();
+      if (!marketId) return;
+
+      const isPolymarket = exchange === 'polymarket';
+      const isKalshi = exchange === 'kalshi';
+      const actions = document.createElement('div');
+      actions.className = 'market-actions';
+
+      // 📈 Price — always available if marketId present
+      actions.innerHTML += `<button class="action-btn" onclick="showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'))">📈 Price</button>`;
+
+      // Polymarket-only actions
+      if (isPolymarket && conditionId) {
+        actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showTradesPanel('${marketId}','${conditionId}',this)">🔄 Trades</button>`;
+      }
+      if (isPolymarket && tokenId) {
+        actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
+      }
+      // Kalshi-only actions — extract ticker by stripping 'ka_' prefix
+      if (isKalshi && marketId) {
+        const ticker = marketId.replace(/^ka_/i, '');
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
+        actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
+      }
+
+    // 🗂 Markets — available when event_id present
+      if (eventId) {
+      actions.innerHTML += `<button class="action-btn" onclick="showMarketsPanel('${marketId}','${eventId}',this)">🗂 Markets</button>`;
+      }
+
+      card.appendChild(actions);
+    });
+  }
+
+  // ── Panel helpers ──────────────────────────────────
+  function panelId(marketId, type) {
+    return `panel-${type}-${marketId.replace(/[^a-z0-9]/gi,'_')}`;
+  }
+
+  function togglePanel(marketCard, pid, buildFn) {
+    const existing = document.getElementById(pid);
+    if (existing) { existing.remove(); return false; }
+    const panel = document.createElement('div');
+    panel.className = 'market-panel'; panel.id = pid;
+    marketCard.insertAdjacentElement('afterend', panel);
+    buildFn(panel);
+    return true;
+  }
+
+  function panelShell(panel, title, subtitle, badgeText, badgeColor, marketSubtitle) {
+    panel.innerHTML = `
+      <div class="panel-header">
+        <div>
+          <div class="panel-title">${title}</div>
+          ${marketSubtitle ? `<div class="panel-title-sub" style="color:var(--text2);margin-bottom:2px;">${marketSubtitle}</div>` : ''}
+          ${subtitle ? `<div class="panel-title-sub">${subtitle}</div>` : ''}
+        </div>
+        <div style="display:flex;align-items:center;gap:0;">
+          <span class="panel-badge" id="${panel.id}-badge"
+            style="color:${badgeColor};background:${badgeColor}22;border:1px solid ${badgeColor}44;">
+            ${badgeText}
+          </span>
+          <button class="panel-close" onclick="document.getElementById('${panel.id}').remove()">✕</button>
+        </div>
+      </div>
+      <div id="${panel.id}-body"><div class="panel-loading">Loading...</div></div>
+    `;
+  }
+
+  // ── 📈 PRICE CHART ─────────────────────────────────
+  async function showPriceChart(el) {
+    const marketId    = el.dataset.marketId;
+    const tokenId     = el.dataset.tokenId;
+    const conditionId = el.dataset.conditionId;
+    const exchange    = el.dataset.exchange || 'Polymarket';
+    const card        = el.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid         = panelId(marketId, 'price');
+
+    const opened = togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, '', 'LOADING', 'var(--accent)', subtitle);
+
+      try {
+        const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
+        const omdData = await omdRes.json();
+        const prices  = (omdData||[])
+          .filter(r => r.outcome==='Yes' && r.close_price!=null)
+          .sort((a,b) => a.end_period_date.localeCompare(b.end_period_date))
+          .map(r => ({ date:r.end_period_date, price:parseFloat(r.close_price) }));
+
+        if (!prices.length) { document.getElementById(`${pid}-body`).innerHTML = '<div class="panel-loading">No price history available.</div>'; return; }
+
+        let livePrice=null, liveTime=null, hasLive=false;
+        if (exchange==='Polymarket' && tokenId) {
+          try {
+            const lr = await fetch(`${LIVE_PRICE}?token_id=${encodeURIComponent(tokenId)}`);
+            const ld = await lr.json();
+            if (ld.price!=null) { livePrice=parseFloat(ld.price); liveTime=ld.time||null; hasLive=true; }
+          } catch(e) {}
+        }
+
+        const labels = prices.map(p => { const d=new Date(p.date+'T00:00:00'); return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; });
+        const data   = prices.map(p => Math.round(p.price*1000)/10);
+        if (hasLive) {
+          const ld = liveTime ? new Date(liveTime*1000) : new Date();
+          labels.push(`${ld.getMonth()+1}/${ld.getDate()}/${String(ld.getFullYear()).slice(2)} ▲`);
+          data.push(Math.round(livePrice*1000)/10);
+        }
+
+        const firstP=data[0], prevP=data[hasLive?data.length-2:data.length-1], currP=data[data.length-1];
+        const chAll=currP-firstP, ch1d=currP-prevP;
+
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+        const pointColors = data.map((_,i) => hasLive&&i===data.length-1?'#4da6ff':'transparent');
+        const pointRadius = data.map((_,i) => hasLive&&i===data.length-1?5:2);
+
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type:'line',
+          data:{ labels, datasets:[{ data, borderColor:'#00e5a0', borderWidth:1.5,
+            pointBackgroundColor:pointColors, pointBorderColor:pointColors, pointRadius, pointHoverRadius:5,
+            fill:true, backgroundColor:(ctx)=>{ const g=ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(0,229,160,0.15)'); g.addColorStop(1,'rgba(0,229,160,0)'); return g; }, tension:0.3 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
+            interaction:{mode:'index',intersect:false},
+            plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+              titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:12},
+              callbacks:{ title:(i)=>{ const l=i[0].label; return l.includes('▲')?l.replace(' ▲','')+' · LIVE':l; }, label:(i)=>` ${i.raw.toFixed(1)}%` } } },
+            scales:{ x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} },
+              y2:{ min:Math.max(0,Math.min(...data)-5), max:Math.min(100,Math.max(...data)+5), position:'right', grid:{drawOnChartArea:false}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>v+'%'}, border:{color:'rgba(255,255,255,0.07)'} } } }
+        });
+
+        const badge = document.getElementById(`${pid}-badge`);
+        if (hasLive) { badge.textContent='LIVE'; badge.style.color='var(--accent)'; badge.style.background='var(--accent-dim)'; badge.style.border='1px solid rgba(0,229,160,0.25)'; }
+        else { badge.textContent='EOD'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)'; }
+
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Current</div><div class="stat-value">${currP.toFixed(1)}%</div></div>
+          <div class="stat"><div class="stat-label">1D Change</div><div class="stat-value ${ch1d>=0?'up':'down'}">${ch1d>=0?'+':''}${ch1d.toFixed(1)}%</div></div>
+          <div class="stat"><div class="stat-label">All-Time Change</div><div class="stat-value ${chAll>=0?'up':'down'}">${chAll>=0?'+':''}${chAll.toFixed(1)}%</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">As of</div><div class="stat-value" style="font-size:11px;">${hasLive?'Live':'Prior Day Close'}</div></div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML = '<div class="panel-loading">Failed to load price data.</div>'; console.error(e); }
+    });
+  }
+
+  // ── 📊 VOLUME CHART ───────────────────────────────
+  async function showVolumePanel(marketId, conditionId, btn) {
+    const card = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid   = panelId(marketId, 'volume');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)', subtitle);
+      try {
+        const res  = await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
+        const json = await res.json();
+        const pts  = (json.data || []).sort((a,b)=>a.timestamp-b.timestamp);
+
+        if (!pts.length) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No volume data available.</div>'; return; }
+
+        const labels   = pts.map(p => fmtDate(p.timestamp));
+        const yesVol   = pts.map(p => Math.round((p.yes_volume||0)*100)/100);
+        const noVol    = pts.map(p => Math.round((p.no_volume||0)*100)/100);
+        const totalVol = pts.reduce((s,p)=>(s+(p.total_volume||0)),0);
+
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent='90D'; badge.style.color='var(--blue)'; badge.style.background='var(--blue-dim)'; badge.style.border='1px solid rgba(77,166,255,0.25)';
+
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type:'bar',
+          data:{ labels, datasets:[
+            { label:'YES', data:yesVol, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, stack:'vol' },
+            { label:'NO',  data:noVol,  backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, stack:'vol' }
+          ]},
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},
+              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+                titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
+                callbacks:{ label:(i)=>` ${i.dataset.label}: ${fmtVol(i.raw)}` } } },
+            scales:{ x:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
+        });
+
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">${fmtVol(totalVol)}</div></div>
+          <div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">${fmtVol(yesVol.reduce((s,v)=>s+v,0))}</div></div>
+          <div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">${fmtVol(noVol.reduce((s,v)=>s+v,0))}</div></div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load volume data.</div>'; console.error(e); }
+    });
+  }
+
+// ── 📖 ORDER BOOK ─────────────────────────────────
+  async function showOrderbookPanel(marketId, tokenId, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid   = panelId(marketId, 'orderbook');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
+      try {
+        const res  = await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
+        const json = await res.json();
+        const snap = (json.snapshots||[])[0];
+
+        if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
+
+        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
+        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
+
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
+
+        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
+        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
+        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
+
+        // Single dataset with per-bar colors — centers each bar in its slot
+        const combinedData = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
+          return bid ? bid.size : (ask ? ask.size : 0);
+        });
+        const barColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
+        });
+        const borderColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
+          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
+        });
+
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `
+          <div style="display:flex;gap:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+            </div>
+          </div>
+          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+          <div class="panel-stats" id="${pid}-stats"></div>`;
+
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type: 'bar',
+          data: {
+            labels: allPriceLabels,
+            datasets: [{
+              data: combinedData,
+              backgroundColor: barColors,
+              borderColor: borderColors,
+              borderWidth: 0,
+              barPercentage: 0.8,
+              categoryPercentage: 0.9
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: {duration: 300},
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                titleColor: '#8a9099', bodyColor: '#f0f2f5',
+                titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
+                bodyFont: {family: "'IBM Plex Mono',monospace", size: 11},
+                callbacks: {
+                  label: (i) => {
+                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
+                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} shares`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { offset: true, grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}, maxRotation: 0}, border: {color: 'rgba(255,255,255,0.07)'} },
+              y: { grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}}, border: {color: 'rgba(255,255,255,0.07)'} }
+            }
+          }
+        });
+
+        const spread = asks.length && bids.length ? ((asks[0].price - bids[0].price)*100).toFixed(1) : 'N/A';
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
+          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread !== 'N/A' ? spread+'%' : 'N/A'}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp/1000) : 'Recent'}</div></div>`;
+
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load orderbook data.</div>'; console.error(e); }
+    });
+  }
+ 
+  // ── 🔄 TRADES TABLE ───────────────────────────────
+  async function showTradesPanel(marketId, conditionId, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid   = panelId(marketId, 'trades');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)', subtitle);
+      try {
+        const res  = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
+        const json = await res.json();
+        const trades = (json.trades || []).slice(0, 20);
+
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent=`${trades.length} TRADES`; badge.style.color='var(--text2)'; badge.style.background='var(--bg4)'; badge.style.border='1px solid var(--border2)';
+
+        const body = document.getElementById(`${pid}-body`);
+        if (!trades.length) { body.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>'; return; }
+
+        const rows = trades.map(t => {
+          const side    = t.side === 'BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
+          const outcome = t.is_yes_side ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
+          const price   = (t.price * 100).toFixed(1) + '%';
+          const amount  = fmtVol(t.amount_usd);
+          const time    = fmtTime(t.timestamp);
+          const wallet  = t.user ? t.user.slice(0,6)+'...'+t.user.slice(-4) : 'N/A';
+          return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${wallet}</td></tr>`;
+        }).join('');
+
+        body.innerHTML = `
+          <div style="overflow-x:auto;margin-top:4px;">
+            <table class="trades-table">
+              <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load trades data.</div>'; console.error(e); }
+    });
+  }
+
+  // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
+  async function showKalshiTradesPanel(marketId, ticker, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid   = panelId(marketId, 'trades');
+ 
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)', subtitle);
+      try {
+        const res = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
+        const json   = await res.json();
+        const trades = (json.trades || []).slice(0, 20);
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent = `${trades.length} TRADES`;
+        badge.style.color = 'var(--text2)';
+        badge.style.background = 'var(--bg4)';
+        badge.style.border = '1px solid var(--border2)';
+ 
+        const body = document.getElementById(`${pid}-body`);
+        if (!trades.length) {
+          body.innerHTML = '<div class="panel-loading">No trades found in the last 7 days.</div>';
+          return;
+        }
+ 
+        const rows = trades.map(t => {
+          const side    = t.side === 'BUY'
+            ? '<span class="buy">BUY</span>'
+            : '<span class="sell">SELL</span>';
+          const outcome = t.is_yes_side
+            ? '<span class="yes">YES</span>'
+            : '<span class="no">NO</span>';
+          const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
+          
+          const amount  = fmtVol(t.amount_usd);
+          const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
+          const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
+          return `<tr>
+            <td>${time}</td>
+            <td>${side}</td>
+            <td>${outcome}</td>
+            <td>${price}</td>
+            <td>${amount}</td>
+            <td style="color:var(--text3)">${contracts}</td>
+          </tr>`;
+        }).join('');
+ 
+        body.innerHTML = `
+          <div style="overflow-x:auto;margin-top:4px;">
+            <table class="trades-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Side</th>
+                  <th>Outcome</th>
+                  <th>Price</th>
+                  <th>~Amount</th>
+                  <th>Contracts</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </div>`;
+      } catch(e) {
+        document.getElementById(`${pid}-body`).innerHTML =
+          '<div class="panel-loading">Failed to load trades data.</div>';
+        console.error(e);
+      }
+    });
+  }
+ 
+  // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
+  async function showKalshiOrderbookPanel(marketId, ticker, btn) {
+    const card  = btn.closest('.market-card');
+    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid   = panelId(marketId, 'orderbook');
+ 
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
+      try {
+        const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
+        const json = await res.json();
+        // Response is already normalized by proxy — bids/asks with decimal prices
+        const snap = (json.snapshots || [])[0];
+ 
+        if (!snap) {
+          document.getElementById(`${pid}-body`).innerHTML =
+            '<div class="panel-loading">No orderbook data available.</div>';
+          return;
+        }
+ 
+        const bids = (snap.bids || []).sort((a,b) => b.price - a.price).slice(0, 15);
+        const asks = (snap.asks || []).sort((a,b) => a.price - b.price).slice(0, 15);
+ 
+        const badge = document.getElementById(`${pid}-badge`);
+        badge.textContent = 'LIVE';
+        badge.style.color = 'var(--amber)';
+        badge.style.background = 'var(--amber-dim)';
+        badge.style.border = '1px solid rgba(240,165,0,0.25)';
+ 
+        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
+        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
+        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])]
+          .sort((a,b) => parseFloat(a) - parseFloat(b));
+ 
+        const combinedData = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
+          return bid ? bid.size : (ask ? ask.size : 0);
+        });
+        const barColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
+        });
+        const borderColors = allPriceLabels.map(p => {
+          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
+          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
+        });
+ 
+        const body = document.getElementById(`${pid}-body`);
+        body.innerHTML = `
+          <div style="display:flex;gap:14px;margin-bottom:6px;">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
+              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
+            </div>
+          </div>
+          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
+          <div class="panel-stats" id="${pid}-stats"></div>`;
+ 
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type: 'bar',
+          data: {
+            labels: allPriceLabels,
+            datasets: [{
+              data: combinedData,
+              backgroundColor: barColors,
+              borderColor: borderColors,
+              borderWidth: 0,
+              barPercentage: 0.8,
+              categoryPercentage: 0.9
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+            plugins: {
+              legend: { display: false },
+              tooltip: {
+                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+                titleColor: '#8a9099', bodyColor: '#f0f2f5',
+                titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+                bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
+                callbacks: {
+                  label: (i) => {
+                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
+                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} contracts`;
+                  }
+                }
+              }
+            },
+            scales: {
+              x: { offset: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+              y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 } }, border: { color: 'rgba(255,255,255,0.07)' } }
+            }
+          }
+        });
+ 
+        const bestBid = snap.best_bid ? (snap.best_bid * 100).toFixed(1) + '%' : (bids.length ? (bids[0].price * 100).toFixed(1) + '%' : 'N/A');
+        const bestAsk = snap.best_ask ? (snap.best_ask * 100).toFixed(1) + '%' : (asks.length ? (asks[0].price * 100).toFixed(1) + '%' : 'N/A');
+        const spread  = bids.length && asks.length
+          ? ((asks[0].price - bids[0].price) * 100).toFixed(1) + '%'
+          : 'N/A';
+ 
+        document.getElementById(`${pid}-stats`).innerHTML = `
+          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div>
+          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div>
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp / 1000) : 'Recent'}</div></div>`;
+ 
+      } catch(e) {
+        document.getElementById(`${pid}-body`).innerHTML =
+          '<div class="panel-loading">Failed to load orderbook data.</div>';
+        console.error(e);
+      }
+    });
+  }
+
+async function showOpenInterestPanel(marketId, conditionId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+  const pid   = panelId(marketId, 'oi');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)', subtitle);
+    try {
+      const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
+      const json = await res.json();
+      const pts = (json.open_interest_over_time || []).sort((a,b) => a.timestamp - b.timestamp);
+
+      if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No open interest data available.</div>'); return; }
+
+      const labels  = pts.map(p => fmtDate(p.timestamp));
+      const data = pts.map(p => Math.round((p.open_interest_usd || 0) * 100) / 100);
+      const currOI  = data[data.length - 1];
+      const prevOI  = data[0];
+      const chOI    = currOI - prevOI;
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+      safeBadge(`${pid}-badge`, '90D', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
+
+      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+      const canvasEl = document.getElementById(`${pid}-canvas`);
+      if (!canvasEl) return;
+      chartInstances[pid] = new Chart(canvasEl, {
+        type: 'line',
+        data: { labels, datasets: [{ data, borderColor: '#f0a500', borderWidth: 1.5,
+          pointRadius: 0, pointHoverRadius: 4, fill: true,
+          backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(240,165,0,0.15)'); g.addColorStop(1,'rgba(240,165,0,0)'); return g; },
+          tension: 0.3 }] },
+        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            titleColor: '#8a9099', bodyColor: '#f0f2f5',
+            titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+            bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
+            callbacks: { label: (i) => ` ${fmtVol(i.raw)}` } } },
+          scales: {
+            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
+            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
+          } }
+      });
+
+      safeHTML(`${pid}-stats`, `
+        <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
+        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
+        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
+        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
+    } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
+  });
+}
+
+async function showMarketsPanel(marketId, eventId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+  const pid   = panelId(marketId, 'markets');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, 'All markets for this event', 'LOADING', 'var(--text2)');
+    try {
+      const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
+      const json   = await res.json();
+      const arr = Array.isArray(json) ? json : (json?.markets || json?.data || json?.results || Object.values(json) || []);
+      const markets = arr.sort((a,b) => (b.yes_price||0) - (a.yes_price||0));
+
+      safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      if (!markets.length) { bodyEl.innerHTML = '<div class="panel-loading">No markets found for this event.</div>'; return; }
+
+      const rows = markets.map(m => {
+        const prob      = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
+        const probClass = m.yes_price > 0.65 ? 'color:var(--accent)' : m.yes_price < 0.40 ? 'color:var(--red)' : 'color:var(--amber)';
+        const vol       = fmtVol(m.market_volume);
+        const expires   = m.expiration_date ? m.expiration_date : 'N/A';
+        const active    = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
+        const label     = m.market_subtitle ? escapeHTML(m.market_subtitle) : escapeHTML(m.market_title);
+        return `<tr>
+          <td>${active} ${label}</td>
+          <td style="font-family:var(--mono);${probClass};font-weight:500;">${prob}</td>
+          <td>${vol}</td>
+          <td style="color:var(--text3);">${expires}</td>
+        </tr>`;
+      }).join('');
+
+      bodyEl.innerHTML = `
+        <div style="overflow-x:auto;margin-top:4px;">
+          <table class="trades-table">
+            <thead><tr><th>Market</th><th>Yes %</th><th>Volume</th><th>Expires</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } catch(e) {
+     console.error(e) 
+     safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
+      console.error(e);
+    }
+  });
+} 
+ 
+  // ── Chat send ──────────────────────────────────────
+
+
+
+  // ── 📈 FORECAST PANEL ──────────────────────────────────
+  async function showForecastPanel(marketId, exchange, rawEventId, btn) {
+  const card  = btn.closest('.market-card');
+  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+  const pid   = panelId(marketId, 'forecast');
+
+  togglePanel(card, pid, async (panel) => {
+    panelShell(panel, title, 'Market forecast history', 'LOADING', 'var(--accent)');
+
+    try {
+      const now      = Math.floor(Date.now() / 1000);
+      const isKalshi = exchange.toLowerCase() === 'kalshi';
+      const start    = isKalshi
+        ? now - (90 * 86400)   // Kalshi supports 90 days
+        : now - (15 * 86400);  // Polymarket max is 15 days
+
+      // Choose endpoint based on exchange
+      const url = isKalshi
+        ? `${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`
+        : `${API_BASE}/get_polymarket_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&fidelity=60`;
+
+      const res  = await fetch(url);
+      if (!res.ok) throw new Error(`Forecast API error: ${res.status}`);
+      const data = await res.json();
+      const raw  = data.history || [];
+
+      if (!raw.length) {
+        safeHTML(`${pid}-body`, '<div class="panel-loading">No forecast data available for this market.</div>');
+        safeBadge(`${pid}-badge`, 'N/A', 'var(--text3)', 'var(--bg4)', '1px solid var(--border2)');
+        return;
+      }
+
+      // Normalize values:
+      // Kalshi returns raw decimal (0.21 = 0.21%), Polymarket returns display units (3.65 = 3.65%)
+      // Both should be displayed as-is since they're already in the right scale for their markets
+      const pts = raw
+        .filter(d => d.p !== null && d.p !== undefined && Math.abs(d.p) < 1000)
+        .sort((a, b) => a.t - b.t);
+
+      if (!pts.length) {
+        safeHTML(`${pid}-body`, '<div class="panel-loading">No valid forecast data found.</div>');
+        return;
+      }
+
+      const labels = pts.map(d => {
+        const dt = new Date(d.t * 1000);
+        return `${dt.getMonth()+1}/${dt.getDate()}/${String(dt.getFullYear()).slice(2)}`;
+      });
+      const values = pts.map(d => Math.round(d.p * 10000) / 10000);
+
+      const currVal  = values[values.length - 1];
+      const prevVal  = values[0];
+      const change   = currVal - prevVal;
+      const minVal   = Math.min(...values);
+      const maxVal   = Math.max(...values);
+
+      // Display raw values as returned by the API — no unit conversion
+      const fmt = v => parseFloat(v.toFixed(6)).toString();
+
+      const bodyEl = document.getElementById(`${pid}-body`);
+      if (!bodyEl) return;
+      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+
+      safeBadge(`${pid}-badge`, exchange.toUpperCase(), 'var(--accent)', 'var(--accent-dim)', '1px solid rgba(0,229,160,0.25)');
+
+      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+      const canvasEl = document.getElementById(`${pid}-canvas`);
+      if (!canvasEl) return;
+
+      chartInstances[pid] = new Chart(canvasEl, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            data: values,
+            borderColor: '#00e5a0',
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            fill: true,
+            backgroundColor: (ctx) => {
+              const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, 140);
+              g.addColorStop(0, 'rgba(0,229,160,0.15)');
+              g.addColorStop(1, 'rgba(0,229,160,0)');
+              return g;
+            },
+            tension: 0.3
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 300 },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#161c24',
+              borderColor: 'rgba(255,255,255,0.1)',
+              borderWidth: 1,
+              titleColor: '#8a9099',
+              bodyColor: '#f0f2f5',
+              titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
+              bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
+              callbacks: {
+                label: (i) => ` Forecast: ${fmt(i.raw)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            },
+            y: {
+              min: minVal - Math.abs(minVal * 0.02),
+              max: maxVal + Math.abs(maxVal * 0.02),
+              grid: { color: 'rgba(255,255,255,0.04)' },
+              ticks: {
+                color: '#8a9099',
+                font: { family: "'IBM Plex Mono',monospace", size: 11 },
+                callback: v => fmt(v)
+              },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            },
+            y2: {
+              position: 'right',
+              min: minVal - Math.abs(minVal * 0.02),
+              max: maxVal + Math.abs(maxVal * 0.02),
+              grid: { drawOnChartArea: false },
+              ticks: {
+                color: '#8a9099',
+                font: { family: "'IBM Plex Mono',monospace", size: 11 },
+                callback: v => fmt(v)
+              },
+              border: { color: 'rgba(255,255,255,0.07)' }
+            }
+          }
+        }
+      });
+
+      safeHTML(`${pid}-stats`, `
+        <div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div>
+        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '+' : ''}${fmt(change)}</div></div>
+        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmt(maxVal)}</div></div>
+        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmt(minVal)}</div></div>
+        <div class="stat" style="margin-left:auto;"><div class="stat-label">Source</div><div class="stat-value" style="font-size:11px;">${exchange.toUpperCase()}</div></div>`);
+
+    } catch(e) {
+      safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load forecast data.</div>');
+      console.error(e);
+    }
+  });
+}
+
+</script>
+
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none;">Info@OpenMindData.io</a></div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;&middot;&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none;">openminddata.io</a></div>
+</body>
+</html>
