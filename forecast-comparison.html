@@ -653,29 +653,7 @@
     row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
     messagesEl.appendChild(row);
   }
-  function removeTyping() { const el = document.getElementById('typing-row'); if (el) el.remove(); }
-  function addBotMsg(html) {
-    const row = document.createElement('div');
-    row.className = 'msg bot';
-    const avatar = document.createElement('div');
-    avatar.className = 'avatar'; avatar.textContent = 'AI';
-    const bubble = document.createElement('div');
-    bubble.className = 'bubble';
-    bubble.innerHTML = isHTML(html) ? html : `<p>${escapeHTML(html)}</p>`;
-    row.appendChild(avatar); row.appendChild(bubble);
-    messagesEl.appendChild(row);
-    // Inject action buttons into market cards
-    injectActionButtons(bubble);
-    scrollToEl(row);
-    return bubble;
-  }
-  function addErrorMsg(msg) {
-    const row = document.createElement('div');
-    row.className = 'msg bot';
-    row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="error-msg">${escapeHTML(msg)}</div></div>`;
-    messagesEl.appendChild(row); scrollToEl(row);
-  }
-  function setLoading(val) { busy = val; sendBtn.disabled = val; }
+  
 
   // ── Inject action buttons into market cards ────────
   function injectActionButtons(bubble) {
@@ -1495,7 +1473,6 @@ async function showMarketsPanel(marketId, eventId, btn) {
     }
   });
 }
-
 
 
 </script>
