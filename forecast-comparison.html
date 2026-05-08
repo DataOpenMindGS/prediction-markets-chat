@@ -73,7 +73,6 @@
   .chart-panel { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:12px; }
   .chart-panel-title { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; color:var(--text3); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
   .chart-panel-val { font-size:13px; font-weight:500; font-family:var(--mono); }
-  /* shared panel styles needed by shared_js */
   .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; }
   .market-title { font-size:12px; font-weight:500; color:var(--text); line-height:1.5; margin-bottom:2px; }
   .market-subtitle { font-size:11px; color:var(--text2); line-height:1.4; margin-bottom:6px; display:flex; align-items:center; gap:4px; }
@@ -213,6 +212,7 @@
   window.addEventListener('unhandledrejection', function(e) {
     console.error('UNHANDLED PROMISE:', e.reason && e.reason.stack || e.reason);
   });
+
   const API_BASE      = 'https://api.dataopenmind.com/public';
   const ECON_URL      = API_BASE + '/get_economic_stats';
   const KALSHI_FC     = API_BASE + '/get_kalshi_forecast';
@@ -226,14 +226,13 @@
   const KALSHI_TRADES    = API_BASE + '/get_kalshi_trades';
   const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
   const GET_MARKETS   = API_BASE + '/get_markets';
-  const OMD_FORECAST  = API_BASE + '/get_omd_forecast';
 
   const MONTH_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
-  let chartInstances = {};
-  let allRows        = [];
+  let chartInstances  = {};
+  let allRows         = [];
   let rowForecastData = {};
-  let expandedRows   = new Set();
+  let expandedRows    = new Set();
 
   function esc(s) {
     return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -245,6 +244,18 @@
     if (!row.reference_year) return '—';
     if (!row.reference_month) return String(row.reference_year);
     return MONTH_NAMES[(row.reference_month - 1)] + ' ' + row.reference_year;
+  }
+
+  // ── Safe fetch ─────────────────────────────────────────────────
+  async function safeFetch(url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return { history: [] };
+      const text = await res.text();
+      if (!text || !text.trim()) return { history: [] };
+      try { return JSON.parse(text); }
+      catch(e) { console.warn('JSON parse error for', url, e.message); return { history: [] }; }
+    } catch(e) { console.warn('Fetch error for', url, e.message); return { history: [] }; }
   }
 
   // ── Filter population ──────────────────────────────────────────
@@ -294,7 +305,6 @@
       if (!data || data.error) throw new Error(data && data.error ? data.error : 'API error');
       if (!Array.isArray(data) || !data.length) { showState('empty'); return; }
 
-      // Group by country + metric + flavor + reference_year + reference_month
       const grouped = {};
       data.forEach(d => {
         const key = [
@@ -322,7 +332,6 @@
         if (exch === 'forecastex' && !grouped[key].events.forecastex) grouped[key].events.forecastex = d;
       });
 
-      // Sort by country, metric, flavor, year desc, month asc
       allRows = Object.values(grouped).sort((a, b) => {
         const cmp = (a.country + a.metric + a.flavor).localeCompare(b.country + b.metric + b.flavor);
         if (cmp !== 0) return cmp;
@@ -353,7 +362,6 @@
     tbody.innerHTML = '';
     allRows.forEach(row => {
       const sk   = safeKey(row.key);
-      const fc   = rowForecastData[row.key] || {};
       const repEvt = row.events.kalshi || row.events.polymarket || row.events.forecastex;
 
       const tr = document.createElement('tr');
@@ -372,7 +380,6 @@
         '<td class="td-num" id="fc-omdfx-'  + sk + '">' + spinnerCell() + '</td>';
       tbody.appendChild(tr);
 
-      // Expand row
       const trEx = document.createElement('tr');
       trEx.id = 'expand-' + sk;
       trEx.className = 'expand-row';
@@ -389,7 +396,6 @@
   }
 
   function spinnerCell() { return '<span class="spinner"></span>'; }
-  function naCell()      { return '<span class="td-num na">—</span>'; }
 
   function exchangeBadges(events) {
     let out = '';
@@ -404,7 +410,7 @@
     const id = 'fc-' + colType + '-' + sk;
     const el = document.getElementById(id);
     if (!el) return;
-    if (val === null) {
+    if (val === null || val === undefined) {
       el.textContent = '—';
       el.className = 'td-num na';
     } else {
@@ -417,66 +423,95 @@
     }
   }
 
-  // ── Load all forecasts lazily ──────────────────────────────────
+  // ── Load all forecasts — batched endpoint_only calls ───────────
   async function loadAllForecasts() {
+    // Collect event_ids per source
+    const kalshiIds     = allRows.filter(r => r.events.kalshi).map(r => r.events.kalshi.event_id);
+    const polymarketIds = allRows.filter(r => r.events.polymarket).map(r => r.events.polymarket.event_id);
+    const forecastexIds = allRows.filter(r => r.events.forecastex).map(r => r.events.forecastex.event_id);
+
+    // Batch-fetch OMD endpoints (one call per exchange)
+    async function fetchOmdEndpoints(ids) {
+      if (!ids.length) return {};
+      const params = ids.map(id => 'event_id=' + encodeURIComponent(id)).join('&');
+      const data   = await safeFetch(OMD_FC + '?' + params + '&endpoint_only=true');
+      // Normalize to map: event_id -> {latest_p, latest_ts, calc_method}
+      const map = {};
+      const forecasts = data.forecasts || (data.event_id ? [data] : []);
+      forecasts.forEach(f => { if (f.event_id) map[f.event_id] = f; });
+      return map;
+    }
+
+    // Fetch Kalshi published endpoint for a single event (external API, no batch)
+    async function fetchKalshiEndpoint(rawId) {
+      const now   = Math.floor(Date.now() / 1000);
+      const nowH  = Math.floor(now / 3600) * 3600;
+      const start = nowH - (90 * 86400);
+      const data  = await safeFetch(
+        KALSHI_FC + '?event_id=' + encodeURIComponent(rawId)
+        + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60'
+      );
+      const hist = (data.history || []).filter(p => p.p != null);
+      return hist.length ? hist[hist.length - 1] : null;
+    }
+
+    // Fire all three OMD batch calls in parallel
+    const [omdKMap, omdPMMap, omdFXMap] = await Promise.all([
+      fetchOmdEndpoints(kalshiIds),
+      fetchOmdEndpoints(polymarketIds),
+      fetchOmdEndpoints(forecastexIds),
+    ]);
+
+    // Populate cells; Kalshi published still fetched individually
     for (const row of allRows) {
       if (!rowForecastData[row.key]) rowForecastData[row.key] = {};
       const fc = rowForecastData[row.key];
 
-      // Kalshi published forecast
+      // Kalshi published forecast (individual external call)
       if (row.events.kalshi) {
         const rawId = row.events.kalshi.event_id.replace(/^ka_/i, '');
         try {
-          const now  = Math.floor(Date.now() / 1000);
-          const nowH = Math.floor(now / 3600) * 3600;
-          const start = nowH - (90 * 86400);
-          const data = await safeFetch(KALSHI_FC + '?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60');
-          const hist = (data.history || []).filter(p => p.p != null);
-          fc.kalshiFcHist = hist;
-          fc.kalshiFc     = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.kalshiFc = null; fc.kalshiFcHist = []; }
-      } else { fc.kalshiFc = null; fc.kalshiFcHist = []; }
+          const pt    = await fetchKalshiEndpoint(rawId);
+          fc.kalshiFc     = pt ? pt.p : null;
+          fc.kalshiFcHist = null; // lazy-loaded on expand
+        } catch(e) { fc.kalshiFc = null; fc.kalshiFcHist = null; }
+      } else { fc.kalshiFc = null; fc.kalshiFcHist = null; }
       setCell(row.key, 'kalshi', fc.kalshiFc);
 
-      // OMD from Kalshi event
+      // OMD (Kalshi event)
       if (row.events.kalshi) {
-        try {
-          const data = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.kalshi.event_id));
-          const hist = (data.history || []).filter(p => p.p != null);
-          fc.omdKHist = hist; fc.omdKMethod = data.calc_method;
-          fc.omdK     = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.omdK = null; fc.omdKHist = []; }
-      } else { fc.omdK = null; fc.omdKHist = []; }
+        const f = omdKMap[row.events.kalshi.event_id];
+        fc.omdK       = f ? f.latest_p   : null;
+        fc.omdKTs     = f ? f.latest_ts  : null;
+        fc.omdKMethod = f ? f.calc_method : null;
+        fc.omdKHist   = null; // lazy-loaded on expand
+      } else { fc.omdK = null; fc.omdKHist = null; }
       setCell(row.key, 'omdk', fc.omdK);
 
-      // OMD from Polymarket event
+      // OMD (Polymarket event)
       if (row.events.polymarket) {
-        try {
-          const data = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.polymarket.event_id));
-          const hist = (data.history || []).filter(p => p.p != null);
-          fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method;
-          fc.omdPM     = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.omdPM = null; fc.omdPMHist = []; }
-      } else { fc.omdPM = null; fc.omdPMHist = []; }
+        const f = omdPMMap[row.events.polymarket.event_id];
+        fc.omdPM       = f ? f.latest_p   : null;
+        fc.omdPMTs     = f ? f.latest_ts  : null;
+        fc.omdPMMethod = f ? f.calc_method : null;
+        fc.omdPMHist   = null;
+      } else { fc.omdPM = null; fc.omdPMHist = null; }
       setCell(row.key, 'omdpm', fc.omdPM);
 
-      // OMD from ForecastEx event
+      // OMD (ForecastEx event)
       if (row.events.forecastex) {
-        try {
-          const data = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.forecastex.event_id));
-          const hist = (data.history || []).filter(p => p.p != null);
-          fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method;
-          fc.omdFX     = hist.length ? hist[hist.length-1].p : null;
-        } catch(e) { fc.omdFX = null; fc.omdFXHist = []; }
-      } else { fc.omdFX = null; fc.omdFXHist = []; }
+        const f = omdFXMap[row.events.forecastex.event_id];
+        fc.omdFX       = f ? f.latest_p   : null;
+        fc.omdFXTs     = f ? f.latest_ts  : null;
+        fc.omdFXMethod = f ? f.calc_method : null;
+        fc.omdFXHist   = null;
+      } else { fc.omdFX = null; fc.omdFXHist = null; }
       setCell(row.key, 'omdfx', fc.omdFX);
-
-      await new Promise(r => setTimeout(r, 80));
     }
   }
 
-  // ── Expand/collapse ────────────────────────────────────────────
-  function toggleExpand(key, focusCol) {
+  // ── Expand/collapse — lazy time-series fetch ───────────────────
+  async function toggleExpand(key, focusCol) {
     const sk   = safeKey(key);
     const trEx = document.getElementById('expand-' + sk);
     if (!trEx) return;
@@ -486,24 +521,72 @@
       expandedRows.delete(key);
       return;
     }
+
     expandedRows.add(key);
     trEx.style.display = '';
+
+    // Show loading state immediately
+    const inner = document.getElementById('expand-inner-' + sk);
+    if (inner) inner.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--text3);">Loading time series…</div>';
+
+    const fc  = rowForecastData[key] || {};
+    const row = allRows.find(r => r.key === key);
+
+    // Fetch all missing histories in parallel
+    const fetches = [];
+
+    if (row.events.kalshi && fc.kalshiFcHist === null) {
+      fetches.push((async () => {
+        const rawId = row.events.kalshi.event_id.replace(/^ka_/i, '');
+        const now   = Math.floor(Date.now() / 1000);
+        const nowH  = Math.floor(now / 3600) * 3600;
+        const start = nowH - (90 * 86400);
+        const data  = await safeFetch(
+          KALSHI_FC + '?event_id=' + encodeURIComponent(rawId)
+          + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60'
+        );
+        fc.kalshiFcHist = (data.history || []).filter(p => p.p != null);
+      })());
+    }
+
+    if (row.events.kalshi && fc.omdKHist === null) {
+      fetches.push((async () => {
+        const data  = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.kalshi.event_id));
+        fc.omdKHist = (data.history || []).filter(p => p.p != null);
+      })());
+    }
+
+    if (row.events.polymarket && fc.omdPMHist === null) {
+      fetches.push((async () => {
+        const data   = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.polymarket.event_id));
+        fc.omdPMHist = (data.history || []).filter(p => p.p != null);
+      })());
+    }
+
+    if (row.events.forecastex && fc.omdFXHist === null) {
+      fetches.push((async () => {
+        const data   = await safeFetch(OMD_FC + '?event_id=' + encodeURIComponent(row.events.forecastex.event_id));
+        fc.omdFXHist = (data.history || []).filter(p => p.p != null);
+      })());
+    }
+
+    await Promise.all(fetches);
     renderCharts(key);
   }
 
+  // ── Render expand charts ───────────────────────────────────────
   function renderCharts(key) {
     const sk    = safeKey(key);
     const inner = document.getElementById('expand-inner-' + sk);
     const fc    = rowForecastData[key] || {};
-    const row   = allRows.find(r => r.key === key);
     if (!inner) return;
 
     const series = [
-      { label: 'Kalshi Published',    hist: fc.kalshiFcHist, color: '#4da6ff', method: null },
-      { label: 'OMD (Kalshi)',         hist: fc.omdKHist,     color: '#00e5a0', method: fc.omdKMethod },
-      { label: 'OMD (Polymarket)',     hist: fc.omdPMHist,    color: '#f0a500', method: fc.omdPMMethod },
-      { label: 'OMD (ForecastEx)',     hist: fc.omdFXHist,    color: '#a78bfa', method: fc.omdFXMethod },
-    ].filter(s => s.hist && s.hist.length);
+      { label: 'Kalshi Published', hist: fc.kalshiFcHist, color: '#4da6ff', method: null },
+      { label: 'OMD (Kalshi)',      hist: fc.omdKHist,    color: '#00e5a0', method: fc.omdKMethod },
+      { label: 'OMD (Polymarket)',  hist: fc.omdPMHist,   color: '#f0a500', method: fc.omdPMMethod },
+      { label: 'OMD (ForecastEx)',  hist: fc.omdFXHist,   color: '#a78bfa', method: fc.omdFXMethod },
+    ].filter(s => Array.isArray(s.hist) && s.hist.length);
 
     if (!series.length) {
       inner.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--text3);">No forecast history available.</div>';
@@ -514,9 +597,9 @@
     const grid = document.getElementById('cpg-' + sk);
 
     series.forEach(s => {
-      const cid = 'cv-' + sk + '-' + s.label.replace(/\W/g,'');
+      const cid    = 'cv-' + sk + '-' + s.label.replace(/\W/g,'');
       const latest = s.hist[s.hist.length-1].p;
-      const div = document.createElement('div');
+      const div    = document.createElement('div');
       div.className = 'chart-panel';
       div.innerHTML =
         '<div class="chart-panel-title">' +
@@ -598,7 +681,7 @@
     });
   }
 
-  // ── State ──────────────────────────────────────────────────────
+  // ── State display ──────────────────────────────────────────────
   function showState(state, msg) {
     const sb = document.getElementById('state-box');
     document.getElementById('table-wrap').style.display = 'none';
@@ -612,22 +695,7 @@
     }
   }
 
-  // Safe fetch that always returns {history:[]} on any error
-  async function safeFetch(url) {
-    try {
-      const res = await fetch(url);
-      if (!res.ok) return { history: [] };
-      const text = await res.text();
-      if (!text || !text.trim()) return { history: [] };
-      try { return JSON.parse(text); }
-      catch(e) { console.warn('JSON parse error for', url, e.message); return { history: [] }; }
-    } catch(e) { console.warn('Fetch error for', url, e.message); return { history: [] }; }
-  }
-
-  populateFilters();
-
-  // ── Shared panel/chart helpers (from text-search) ──────────────
-
+  // ── Shared helpers ─────────────────────────────────────────────
   function fmtVol(v) {
     if (v == null) return 'N/A';
     if (v >= 1e6) return '$' + (v/1e6).toFixed(1) + 'M';
@@ -642,80 +710,15 @@
     const d = new Date(ts * 1000);
     return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`;
   }
- function safeHTML(id, html) { const el=document.getElementById(id); if(el) el.innerHTML=html; }
- function safeBadge(id, text, color, bg, border) {
-  const el=document.getElementById(id); if(!el) return;
-  el.textContent=text; el.style.color=color; el.style.background=bg; el.style.border=border;
- }
- 
-  // ── Message rendering ──────────────────────────────
-  function addUserMsg(text) {
-    hideWelcome();
-    const row = document.createElement('div');
-    row.className = 'msg user';
-    row.innerHTML = `<div class="avatar">YOU</div><div class="bubble">${escapeHTML(text)}</div>`;
-    messagesEl.appendChild(row);
-    scrollToEl(row);
-  }
-  function addTyping() {
-    hideWelcome();
-    const row = document.createElement('div');
-    row.className = 'msg bot'; row.id = 'typing-row';
-    row.innerHTML = `<div class="avatar">AI</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
-    messagesEl.appendChild(row);
-  }
-  
-
-  // ── Inject action buttons into market cards ────────
-  function injectActionButtons(bubble) {
-    bubble.querySelectorAll('.market-card').forEach(card => {
-      const probEl      = card.querySelector('.clickable-prob');
-      if (!probEl) return;
-      const marketId    = probEl.dataset.marketId;
-      const tokenId     = probEl.dataset.tokenId;
-      const conditionId = probEl.dataset.conditionId;
-      const eventId     = probEl.dataset.eventId;
-      const exchange    = (probEl.dataset.exchange || '').toLowerCase();
-      if (!marketId) return;
-
-      const isPolymarket = exchange === 'polymarket';
-      const isKalshi = exchange === 'kalshi';
-      const actions = document.createElement('div');
-      actions.className = 'market-actions';
-
-      // 📈 Price — always available if marketId present
-      actions.innerHTML += `<button class="action-btn" onclick="showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'))">📈 Price</button>`;
-
-      // Polymarket-only actions
-      if (isPolymarket && conditionId) {
-        actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showTradesPanel('${marketId}','${conditionId}',this)">🔄 Trades</button>`;
-      }
-      if (isPolymarket && tokenId) {
-        actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
-      }
-      // Kalshi-only actions — extract ticker by stripping 'ka_' prefix
-      if (isKalshi && marketId) {
-        const ticker = marketId.replace(/^ka_/i, '');
-        actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
-      }
-
-    // 🗂 Markets — available when event_id present
-      if (eventId) {
-      actions.innerHTML += `<button class="action-btn" onclick="showMarketsPanel('${marketId}','${eventId}',this)">🗂 Markets</button>`;
-      }
-
-      card.appendChild(actions);
-    });
+  function safeHTML(id, html) { const el=document.getElementById(id); if(el) el.innerHTML=html; }
+  function safeBadge(id, text, color, bg, border) {
+    const el=document.getElementById(id); if(!el) return;
+    el.textContent=text; el.style.color=color; el.style.background=bg; el.style.border=border;
   }
 
-  // ── Panel helpers ──────────────────────────────────
   function panelId(marketId, type) {
     return `panel-${type}-${marketId.replace(/[^a-z0-9]/gi,'_')}`;
   }
-
   function togglePanel(marketCard, pid, buildFn) {
     const existing = document.getElementById(pid);
     if (existing) { existing.remove(); return false; }
@@ -725,7 +728,6 @@
     buildFn(panel);
     return true;
   }
-
   function panelShell(panel, title, subtitle, badgeText, badgeColor, marketSubtitle) {
     panel.innerHTML = `
       <div class="panel-header">
@@ -746,20 +748,18 @@
     `;
   }
 
-  // ── 📈 PRICE CHART ─────────────────────────────────
+  // ── 📈 Price chart ─────────────────────────────────────────────
   async function showPriceChart(el) {
     const marketId    = el.dataset.marketId;
     const tokenId     = el.dataset.tokenId;
-    const conditionId = el.dataset.conditionId;
     const exchange    = el.dataset.exchange || 'Polymarket';
     const card        = el.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const title       = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle    = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
     const pid         = panelId(marketId, 'price');
 
-    const opened = togglePanel(card, pid, async (panel) => {
+    togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, '', 'LOADING', 'var(--accent)', subtitle);
-
       try {
         const omdRes  = await fetch(`${OMD_PRICES}?market_id=${marketId}&days_history=-1`);
         const omdData = await omdRes.json();
@@ -801,7 +801,7 @@
           type:'line',
           data:{ labels, datasets:[{ data, borderColor:'#00e5a0', borderWidth:1.5,
             pointBackgroundColor:pointColors, pointBorderColor:pointColors, pointRadius, pointHoverRadius:5,
-            fill:true, backgroundColor: 'rgba(0,229,160,0.08)', tension:0.3 }] },
+            fill:true, backgroundColor:'rgba(0,229,160,0.08)', tension:0.3 }] },
           options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400},
             interaction:{mode:'index',intersect:false},
             plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
@@ -814,7 +814,7 @@
 
         const badge = document.getElementById(`${pid}-badge`);
         if (hasLive) { badge.textContent='LIVE'; badge.style.color='var(--accent)'; badge.style.background='var(--accent-dim)'; badge.style.border='1px solid rgba(0,229,160,0.25)'; }
-        else { badge.textContent='EOD'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)'; }
+        else { badge.textContent='EOD'; badge.style.color='var(--amber)'; badge.style.background='rgba(240,165,0,0.12)'; badge.style.border='1px solid rgba(240,165,0,0.25)'; }
 
         document.getElementById(`${pid}-stats`).innerHTML = `
           <div class="stat"><div class="stat-label">Current</div><div class="stat-value">${currP.toFixed(1)}%</div></div>
@@ -825,39 +825,32 @@
     });
   }
 
-  // ── 📊 VOLUME CHART ───────────────────────────────
+  // ── 📊 Volume chart ────────────────────────────────────────────
   async function showVolumePanel(marketId, conditionId, btn) {
-    const card = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'volume');
-
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle= card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid     = panelId(marketId, 'volume');
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)', subtitle);
       try {
         const res  = await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
         const json = await res.json();
         const pts  = (json.data || []).sort((a,b)=>a.timestamp-b.timestamp);
-
         if (!pts.length) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No volume data available.</div>'; return; }
-
         const labels   = pts.map(p => fmtDate(p.timestamp));
         const yesVol   = pts.map(p => Math.round((p.yes_volume||0)*100)/100);
         const noVol    = pts.map(p => Math.round((p.no_volume||0)*100)/100);
         const totalVol = pts.reduce((s,p)=>(s+(p.total_volume||0)),0);
-
         const body = document.getElementById(`${pid}-body`);
         body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent='90D'; badge.style.color='var(--blue)'; badge.style.background='var(--blue-dim)'; badge.style.border='1px solid rgba(77,166,255,0.25)';
-
+        safeBadge(`${pid}-badge`,'90D','var(--blue)','rgba(77,166,255,0.12)','1px solid rgba(77,166,255,0.25)');
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
         chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
           type:'bar',
           data:{ labels, datasets:[
-            { label:'YES', data:yesVol, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, stack:'vol' },
-            { label:'NO',  data:noVol,  backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, stack:'vol' }
+            { label:'YES', data:yesVol, backgroundColor:'rgba(0,229,160,0.7)', borderWidth:0, stack:'vol' },
+            { label:'NO',  data:noVol,  backgroundColor:'rgba(255,77,109,0.7)', borderWidth:0, stack:'vol' }
           ]},
           options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
             plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},
@@ -867,7 +860,6 @@
             scales:{ x:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
               y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
-
         document.getElementById(`${pid}-stats`).innerHTML = `
           <div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">${fmtVol(totalVol)}</div></div>
           <div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">${fmtVol(yesVol.reduce((s,v)=>s+v,0))}</div></div>
@@ -876,612 +868,233 @@
     });
   }
 
-// ── 📖 ORDER BOOK ─────────────────────────────────
+  // ── 📖 Orderbook ───────────────────────────────────────────────
   async function showOrderbookPanel(marketId, tokenId, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'orderbook');
-
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle= card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid     = panelId(marketId, 'orderbook');
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
       try {
         const res  = await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
         const json = await res.json();
         const snap = (json.snapshots||[])[0];
-
         if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
-
         const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
         const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
-
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
-
-        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
-        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
-        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
-
-        // Single dataset with per-bar colors — centers each bar in its slot
+        safeBadge(`${pid}-badge`,'LIVE','var(--amber)','rgba(240,165,0,0.12)','1px solid rgba(240,165,0,0.25)');
+        const bidPrices = bids.map(b => (b.price*100).toFixed(1)+'%');
+        const askPrices = asks.map(a => (a.price*100).toFixed(1)+'%');
+        const allPriceLabels = [...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
         const combinedData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
+          const bid = bids.find(b=>(b.price*100).toFixed(1)+'%'===p);
+          const ask = asks.find(a=>(a.price*100).toFixed(1)+'%'===p);
           return bid ? bid.size : (ask ? ask.size : 0);
         });
-        const barColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
-        });
-        const borderColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
-        });
-
+        const barColors   = allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)');
+        const borderColors= allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)');
         const body = document.getElementById(`${pid}-body`);
         body.innerHTML = `
           <div style="display:flex;gap:14px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
-            </div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);">Bids</span></div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);">Asks</span></div>
           </div>
           <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
           <div class="panel-stats" id="${pid}-stats"></div>`;
-
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
         chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
-          type: 'bar',
-          data: {
-            labels: allPriceLabels,
-            datasets: [{
-              data: combinedData,
-              backgroundColor: barColors,
-              borderColor: borderColors,
-              borderWidth: 0,
-              barPercentage: 0.8,
-              categoryPercentage: 0.9
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, animation: {duration: 300},
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-                titleColor: '#8a9099', bodyColor: '#f0f2f5',
-                titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
-                bodyFont: {family: "'IBM Plex Mono',monospace", size: 11},
-                callbacks: {
-                  label: (i) => {
-                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
-                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} shares`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: { offset: true, grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}, maxRotation: 0}, border: {color: 'rgba(255,255,255,0.07)'} },
-              y: { grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}}, border: {color: 'rgba(255,255,255,0.07)'} }
-            }
-          }
+          type:'bar', data:{ labels:allPriceLabels, datasets:[{ data:combinedData, backgroundColor:barColors, borderColor:borderColors, borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+              titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
+              callbacks:{ label:(i)=>{ const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)'; return ` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} shares`; } } } },
+            scales:{ x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
-
-        const spread = asks.length && bids.length ? ((asks[0].price - bids[0].price)*100).toFixed(1) : 'N/A';
+        const spread = asks.length&&bids.length ? ((asks[0].price-bids[0].price)*100).toFixed(1) : 'N/A';
         document.getElementById(`${pid}-stats`).innerHTML = `
           <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
           <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
-          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread !== 'N/A' ? spread+'%' : 'N/A'}</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp/1000) : 'Recent'}</div></div>`;
-
+          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread!=='N/A'?spread+'%':'N/A'}</div></div>
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`;
       } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load orderbook data.</div>'; console.error(e); }
     });
   }
- 
-  // ── 🔄 TRADES TABLE ───────────────────────────────
-  async function showTradesPanel(marketId, conditionId, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'trades');
 
+  // ── 🔄 Trades ──────────────────────────────────────────────────
+  async function showTradesPanel(marketId, conditionId, btn) {
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle= card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid     = panelId(marketId, 'trades');
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)', subtitle);
       try {
-        const res  = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
-        const json = await res.json();
-        const trades = (json.trades || []).slice(0, 20);
-
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent=`${trades.length} TRADES`; badge.style.color='var(--text2)'; badge.style.background='var(--bg4)'; badge.style.border='1px solid var(--border2)';
-
+        const res    = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
+        const json   = await res.json();
+        const trades = (json.trades||[]).slice(0,20);
+        safeBadge(`${pid}-badge`,`${trades.length} TRADES`,'var(--text2)','var(--bg4)','1px solid var(--border2)');
         const body = document.getElementById(`${pid}-body`);
         if (!trades.length) { body.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>'; return; }
-
         const rows = trades.map(t => {
-          const side    = t.side === 'BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
-          const outcome = t.is_yes_side ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
-          const price   = (t.price * 100).toFixed(1) + '%';
-          const amount  = fmtVol(t.amount_usd);
-          const time    = fmtTime(t.timestamp);
-          const wallet  = t.user ? t.user.slice(0,6)+'...'+t.user.slice(-4) : 'N/A';
-          return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${wallet}</td></tr>`;
+          const side    = t.side==='BUY'?'<span style="color:var(--accent)">BUY</span>':'<span style="color:var(--red)">SELL</span>';
+          const outcome = t.is_yes_side?'<span style="color:var(--accent)">YES</span>':'<span style="color:var(--red)">NO</span>';
+          return `<tr><td>${fmtTime(t.timestamp)}</td><td>${side}</td><td>${outcome}</td><td>${(t.price*100).toFixed(1)}%</td><td>${fmtVol(t.amount_usd)}</td><td style="color:var(--text3)">${t.user?t.user.slice(0,6)+'...'+t.user.slice(-4):'N/A'}</td></tr>`;
         }).join('');
-
-        body.innerHTML = `
-          <div style="overflow-x:auto;margin-top:4px;">
-            <table class="trades-table">
-              <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>`;
+        body.innerHTML = `<div style="overflow-x:auto;margin-top:4px;"><table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;"><thead><tr style="color:var(--text3);border-bottom:1px solid var(--border2);"><th style="padding:4px 8px;text-align:left;">Time</th><th style="padding:4px 8px;">Side</th><th style="padding:4px 8px;">Outcome</th><th style="padding:4px 8px;text-align:right;">Price</th><th style="padding:4px 8px;text-align:right;">Amount</th><th style="padding:4px 8px;">Wallet</th></tr></thead><tbody>${rows}</tbody></table></div>`;
       } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load trades data.</div>'; console.error(e); }
     });
   }
 
-  // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
+  // ── 🔄 Kalshi trades ───────────────────────────────────────────
   async function showKalshiTradesPanel(marketId, ticker, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'trades');
- 
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle= card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid     = panelId(marketId, 'trades');
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)', subtitle);
       try {
-        const res = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
+        const res    = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
         const json   = await res.json();
-        const trades = (json.trades || []).slice(0, 20);
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent = `${trades.length} TRADES`;
-        badge.style.color = 'var(--text2)';
-        badge.style.background = 'var(--bg4)';
-        badge.style.border = '1px solid var(--border2)';
- 
+        const trades = (json.trades||[]).slice(0,20);
+        safeBadge(`${pid}-badge`,`${trades.length} TRADES`,'var(--text2)','var(--bg4)','1px solid var(--border2)');
         const body = document.getElementById(`${pid}-body`);
-        if (!trades.length) {
-          body.innerHTML = '<div class="panel-loading">No trades found in the last 7 days.</div>';
-          return;
-        }
- 
+        if (!trades.length) { body.innerHTML='<div class="panel-loading">No trades found in the last 7 days.</div>'; return; }
         const rows = trades.map(t => {
-          const side    = t.side === 'BUY'
-            ? '<span class="buy">BUY</span>'
-            : '<span class="sell">SELL</span>';
-          const outcome = t.is_yes_side
-            ? '<span class="yes">YES</span>'
-            : '<span class="no">NO</span>';
-          const price   = t.price != null ? (t.price * 100).toFixed(1) + '%' : 'N/A';
-          
-          const amount  = fmtVol(t.amount_usd);
-          const time    = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
-          const contracts = t.shares != null ? t.shares.toLocaleString() + ' cts' : 'N/A';
-          return `<tr>
-            <td>${time}</td>
-            <td>${side}</td>
-            <td>${outcome}</td>
-            <td>${price}</td>
-            <td>${amount}</td>
-            <td style="color:var(--text3)">${contracts}</td>
-          </tr>`;
+          const side     = t.side==='BUY'?'<span style="color:var(--accent)">BUY</span>':'<span style="color:var(--red)">SELL</span>';
+          const outcome  = t.is_yes_side?'<span style="color:var(--accent)">YES</span>':'<span style="color:var(--red)">NO</span>';
+          const price    = t.price!=null?(t.price*100).toFixed(1)+'%':'N/A';
+          const contracts= t.shares!=null?t.shares.toLocaleString()+' cts':'N/A';
+          return `<tr><td>${t.timestamp?fmtTime(t.timestamp):'N/A'}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${fmtVol(t.amount_usd)}</td><td style="color:var(--text3)">${contracts}</td></tr>`;
         }).join('');
- 
-        body.innerHTML = `
-          <div style="overflow-x:auto;margin-top:4px;">
-            <table class="trades-table">
-              <thead>
-                <tr>
-                  <th>Time</th>
-                  <th>Side</th>
-                  <th>Outcome</th>
-                  <th>Price</th>
-                  <th>~Amount</th>
-                  <th>Contracts</th>
-                </tr>
-              </thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>`;
-      } catch(e) {
-        document.getElementById(`${pid}-body`).innerHTML =
-          '<div class="panel-loading">Failed to load trades data.</div>';
-        console.error(e);
-      }
+        body.innerHTML = `<div style="overflow-x:auto;margin-top:4px;"><table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;"><thead><tr style="color:var(--text3);border-bottom:1px solid var(--border2);"><th style="padding:4px 8px;text-align:left;">Time</th><th style="padding:4px 8px;">Side</th><th style="padding:4px 8px;">Outcome</th><th style="padding:4px 8px;text-align:right;">Price</th><th style="padding:4px 8px;text-align:right;">~Amount</th><th style="padding:4px 8px;">Contracts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load trades data.</div>'; console.error(e); }
     });
   }
- 
-  // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
+
+  // ── 📖 Kalshi orderbook ────────────────────────────────────────
   async function showKalshiOrderbookPanel(marketId, ticker, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'orderbook');
- 
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle= card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid     = panelId(marketId, 'orderbook');
     togglePanel(card, pid, async (panel) => {
       panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
       try {
         const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
         const json = await res.json();
-        // Response is already normalized by proxy — bids/asks with decimal prices
-        const snap = (json.snapshots || [])[0];
- 
-        if (!snap) {
-          document.getElementById(`${pid}-body`).innerHTML =
-            '<div class="panel-loading">No orderbook data available.</div>';
-          return;
-        }
- 
-        const bids = (snap.bids || []).sort((a,b) => b.price - a.price).slice(0, 15);
-        const asks = (snap.asks || []).sort((a,b) => a.price - b.price).slice(0, 15);
- 
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent = 'LIVE';
-        badge.style.color = 'var(--amber)';
-        badge.style.background = 'var(--amber-dim)';
-        badge.style.border = '1px solid rgba(240,165,0,0.25)';
- 
-        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
-        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
-        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])]
-          .sort((a,b) => parseFloat(a) - parseFloat(b));
- 
-        const combinedData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          const ask = asks.find(a => (a.price * 100).toFixed(1) + '%' === p);
-          return bid ? bid.size : (ask ? ask.size : 0);
-        });
-        const barColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
-        });
-        const borderColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price * 100).toFixed(1) + '%' === p);
-          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
-        });
- 
+        const snap = (json.snapshots||[])[0];
+        if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
+        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
+        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
+        safeBadge(`${pid}-badge`,'LIVE','var(--amber)','rgba(240,165,0,0.12)','1px solid rgba(240,165,0,0.25)');
+        const bidPrices = bids.map(b=>(b.price*100).toFixed(1)+'%');
+        const askPrices = asks.map(a=>(a.price*100).toFixed(1)+'%');
+        const allPriceLabels = [...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
+        const combinedData = allPriceLabels.map(p => { const bid=bids.find(b=>(b.price*100).toFixed(1)+'%'===p); const ask=asks.find(a=>(a.price*100).toFixed(1)+'%'===p); return bid?bid.size:(ask?ask.size:0); });
+        const barColors    = allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p)?'rgba(0,229,160,0.7)':'rgba(255,77,109,0.7)');
+        const borderColors = allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p)?'rgba(0,229,160,0.9)':'rgba(255,77,109,0.9)');
         const body = document.getElementById(`${pid}-body`);
         body.innerHTML = `
           <div style="display:flex;gap:14px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
-            </div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);">Bids</span></div>
+            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);">Asks</span></div>
           </div>
           <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
           <div class="panel-stats" id="${pid}-stats"></div>`;
- 
         if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
         chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
-          type: 'bar',
-          data: {
-            labels: allPriceLabels,
-            datasets: [{
-              data: combinedData,
-              backgroundColor: barColors,
-              borderColor: borderColors,
-              borderWidth: 0,
-              barPercentage: 0.8,
-              categoryPercentage: 0.9
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-                titleColor: '#8a9099', bodyColor: '#f0f2f5',
-                titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
-                bodyFont:  { family: "'IBM Plex Mono',monospace", size: 11 },
-                callbacks: {
-                  label: (i) => {
-                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
-                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} contracts`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: { offset: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
-              y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 } }, border: { color: 'rgba(255,255,255,0.07)' } }
-            }
-          }
+          type:'bar', data:{ labels:allPriceLabels, datasets:[{ data:combinedData, backgroundColor:barColors, borderColor:borderColors, borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
+            plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+              titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
+              callbacks:{ label:(i)=>{ const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)'; return ` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} contracts`; } } } },
+            scales:{ x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}}, border:{color:'rgba(255,255,255,0.07)'} } } }
         });
- 
-        const bestBid = snap.best_bid ? (snap.best_bid * 100).toFixed(1) + '%' : (bids.length ? (bids[0].price * 100).toFixed(1) + '%' : 'N/A');
-        const bestAsk = snap.best_ask ? (snap.best_ask * 100).toFixed(1) + '%' : (asks.length ? (asks[0].price * 100).toFixed(1) + '%' : 'N/A');
-        const spread  = bids.length && asks.length
-          ? ((asks[0].price - bids[0].price) * 100).toFixed(1) + '%'
-          : 'N/A';
- 
+        const bestBid = snap.best_bid?(snap.best_bid*100).toFixed(1)+'%':(bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A');
+        const bestAsk = snap.best_ask?(snap.best_ask*100).toFixed(1)+'%':(asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A');
+        const spread  = bids.length&&asks.length?((asks[0].price-bids[0].price)*100).toFixed(1)+'%':'N/A';
         document.getElementById(`${pid}-stats`).innerHTML = `
           <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div>
           <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div>
           <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp / 1000) : 'Recent'}</div></div>`;
- 
-      } catch(e) {
-        document.getElementById(`${pid}-body`).innerHTML =
-          '<div class="panel-loading">Failed to load orderbook data.</div>';
-        console.error(e);
-      }
+          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`;
+      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load orderbook data.</div>'; console.error(e); }
     });
   }
 
-async function showOpenInterestPanel(marketId, conditionId, btn) {
-  const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-  const pid   = panelId(marketId, 'oi');
+  // ── 📐 Open interest ───────────────────────────────────────────
+  async function showOpenInterestPanel(marketId, conditionId, btn) {
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle= card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid     = panelId(marketId, 'oi');
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)', subtitle);
+      try {
+        const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
+        const json = await res.json();
+        const pts  = (json.open_interest_over_time||[]).sort((a,b)=>a.timestamp-b.timestamp);
+        if (!pts.length) { safeHTML(`${pid}-body`,'<div class="panel-loading">No open interest data available.</div>'); return; }
+        const labels = pts.map(p=>fmtDate(p.timestamp));
+        const data   = pts.map(p=>Math.round((p.open_interest_usd||0)*100)/100);
+        const currOI = data[data.length-1], prevOI=data[0], chOI=currOI-prevOI;
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
+        safeBadge(`${pid}-badge`,'90D','var(--amber)','rgba(240,165,0,0.12)','1px solid rgba(240,165,0,0.25)');
+        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
+        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
+          type:'line', data:{ labels, datasets:[{ data, borderColor:'#f0a500', borderWidth:1.5, pointRadius:0, pointHoverRadius:4, fill:true, backgroundColor:'rgba(240,165,0,0.08)', tension:0.3 }] },
+          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:400}, interaction:{mode:'index',intersect:false},
+            plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
+              titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:12}, callbacks:{label:(i)=>` ${fmtVol(i.raw)}`} } },
+            scales:{ x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} },
+              y2:{ position:'right', min:Math.min(...data), max:Math.max(...data), grid:{drawOnChartArea:false}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
+        });
+        safeHTML(`${pid}-stats`,`
+          <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
+          <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
+          <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
+          <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
+      } catch(e) { safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
+    });
+  }
 
-  togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)', subtitle);
-    try {
-      const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
-      const json = await res.json();
-      const pts = (json.open_interest_over_time || []).sort((a,b) => a.timestamp - b.timestamp);
+  // ── 🗂 Markets panel ───────────────────────────────────────────
+  async function showMarketsPanel(marketId, eventId, btn) {
+    const card    = btn.closest('.market-card');
+    const title   = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const pid     = panelId(marketId, 'markets');
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'All markets for this event', 'LOADING', 'var(--text2)');
+      try {
+        const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
+        const json   = await res.json();
+        const arr    = Array.isArray(json) ? json : (json?.markets||json?.data||json?.results||Object.values(json)||[]);
+        const markets= arr.sort((a,b)=>(b.yes_price||0)-(a.yes_price||0));
+        safeBadge(`${pid}-badge`,`${markets.length} MARKETS`,'var(--text2)','var(--bg4)','1px solid var(--border2)');
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+        if (!markets.length) { bodyEl.innerHTML='<div class="panel-loading">No markets found for this event.</div>'; return; }
+        const rows = markets.map(m => {
+          const prob      = m.yes_price!=null?Math.round(m.yes_price*100)+'%':'N/A';
+          const probStyle = m.yes_price>0.65?'color:var(--accent)':m.yes_price<0.40?'color:var(--red)':'color:var(--amber)';
+          const active    = m.is_active?'<span style="color:var(--accent);font-size:9px;">●</span>':'<span style="color:var(--text3);font-size:9px;">●</span>';
+          return `<tr><td>${active} ${escapeHTML(m.market_subtitle||m.market_title||'')}</td><td style="font-family:var(--mono);${probStyle};font-weight:500;">${prob}</td><td>${fmtVol(m.market_volume)}</td><td style="color:var(--text3);">${m.expiration_date||'N/A'}</td></tr>`;
+        }).join('');
+        bodyEl.innerHTML = `<div style="overflow-x:auto;margin-top:4px;"><table style="width:100%;border-collapse:collapse;font-family:var(--mono);font-size:11px;"><thead><tr style="color:var(--text3);border-bottom:1px solid var(--border2);"><th style="padding:4px 8px;text-align:left;">Market</th><th style="padding:4px 8px;">Yes %</th><th style="padding:4px 8px;text-align:right;">Volume</th><th style="padding:4px 8px;">Expires</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+      } catch(e) { safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load markets data.</div>'); console.error(e); }
+    });
+  }
 
-      if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No open interest data available.</div>'); return; }
-
-      const labels  = pts.map(p => fmtDate(p.timestamp));
-      const data = pts.map(p => Math.round((p.open_interest_usd || 0) * 100) / 100);
-      const currOI  = data[data.length - 1];
-      const prevOI  = data[0];
-      const chOI    = currOI - prevOI;
-
-      const bodyEl = document.getElementById(`${pid}-body`);
-      if (!bodyEl) return;
-      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-
-      safeBadge(`${pid}-badge`, '90D', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
-
-      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-      const canvasEl = document.getElementById(`${pid}-canvas`);
-      if (!canvasEl) return;
-      chartInstances[pid] = new Chart(canvasEl, {
-        type: 'line',
-        data: { labels, datasets: [{ data, borderColor: '#f0a500', borderWidth: 1.5,
-          pointRadius: 0, pointHoverRadius: 4, fill: true,
-          backgroundColor: 'rgba(0,229,160,0.08)',
-          tension: 0.3 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
-          interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-            titleColor: '#8a9099', bodyColor: '#f0f2f5',
-            titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
-            bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
-            callbacks: { label: (i) => ` ${fmtVol(i.raw)}` } } },
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
-          } }
-      });
-
-      safeHTML(`${pid}-stats`, `
-        <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
-        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
-        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
-        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
-    } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
-  });
-}
-
-async function showMarketsPanel(marketId, eventId, btn) {
-  const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-  const pid   = panelId(marketId, 'markets');
-
-  togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, 'All markets for this event', 'LOADING', 'var(--text2)');
-    try {
-      const res    = await fetch(`${GET_MARKETS}?event_id=${encodeURIComponent(eventId)}&nonzero_volume=true`);
-      const json   = await res.json();
-      const arr = Array.isArray(json) ? json : (json?.markets || json?.data || json?.results || Object.values(json) || []);
-      const markets = arr.sort((a,b) => (b.yes_price||0) - (a.yes_price||0));
-
-      safeBadge(`${pid}-badge`, `${markets.length} MARKETS`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
-
-      const bodyEl = document.getElementById(`${pid}-body`);
-      if (!bodyEl) return;
-      if (!markets.length) { bodyEl.innerHTML = '<div class="panel-loading">No markets found for this event.</div>'; return; }
-
-      const rows = markets.map(m => {
-        const prob      = m.yes_price != null ? Math.round(m.yes_price * 100) + '%' : 'N/A';
-        const probClass = m.yes_price > 0.65 ? 'color:var(--accent)' : m.yes_price < 0.40 ? 'color:var(--red)' : 'color:var(--amber)';
-        const vol       = fmtVol(m.market_volume);
-        const expires   = m.expiration_date ? m.expiration_date : 'N/A';
-        const active    = m.is_active ? '<span style="color:var(--accent);font-size:9px;">●</span>' : '<span style="color:var(--text3);font-size:9px;">●</span>';
-        const label     = m.market_subtitle ? escapeHTML(m.market_subtitle) : escapeHTML(m.market_title);
-        return `<tr>
-          <td>${active} ${label}</td>
-          <td style="font-family:var(--mono);${probClass};font-weight:500;">${prob}</td>
-          <td>${vol}</td>
-          <td style="color:var(--text3);">${expires}</td>
-        </tr>`;
-      }).join('');
-
-      bodyEl.innerHTML = `
-        <div style="overflow-x:auto;margin-top:4px;">
-          <table class="trades-table">
-            <thead><tr><th>Market</th><th>Yes %</th><th>Volume</th><th>Expires</th></tr></thead>
-            <tbody>${rows}</tbody>
-          </table>
-        </div>`;
-    } catch(e) {
-     console.error(e) 
-     safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load markets data.</div>');
-      console.error(e);
-    }
-  });
-} 
- 
-  // ── Chat send ──────────────────────────────────────
-
-
-
-  // ── 📈 FORECAST PANEL ──────────────────────────────────
-  async function showForecastPanel(marketId, exchange, rawEventId, btn) {
-  const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-  const pid   = panelId(marketId, 'forecast');
-
-  togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, 'Market forecast history', 'LOADING', 'var(--accent)');
-
-    try {
-      const now      = Math.floor(Date.now() / 1000);
-      const isKalshi = exchange.toLowerCase() === 'kalshi';
-      const start    = isKalshi
-        ? now - (90 * 86400)   // Kalshi supports 90 days
-        : now - (15 * 86400);  // Polymarket max is 15 days
-
-      // Choose endpoint based on exchange
-      const url = isKalshi
-        ? `${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`
-        : `${API_BASE}/get_polymarket_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&fidelity=60`;
-
-      const res  = await fetch(url);
-      if (!res.ok) throw new Error(`Forecast API error: ${res.status}`);
-      const data = await res.json();
-      const raw  = data.history || [];
-
-      if (!raw.length) {
-        safeHTML(`${pid}-body`, '<div class="panel-loading">No forecast data available for this market.</div>');
-        safeBadge(`${pid}-badge`, 'N/A', 'var(--text3)', 'var(--bg4)', '1px solid var(--border2)');
-        return;
-      }
-
-      // Normalize values:
-      // Kalshi returns raw decimal (0.21 = 0.21%), Polymarket returns display units (3.65 = 3.65%)
-      // Both should be displayed as-is since they're already in the right scale for their markets
-      const pts = raw
-        .filter(d => d.p !== null && d.p !== undefined && Math.abs(d.p) < 1000)
-        .sort((a, b) => a.t - b.t);
-
-      if (!pts.length) {
-        safeHTML(`${pid}-body`, '<div class="panel-loading">No valid forecast data found.</div>');
-        return;
-      }
-
-      const labels = pts.map(d => {
-        const dt = new Date(d.t * 1000);
-        return `${dt.getMonth()+1}/${dt.getDate()}/${String(dt.getFullYear()).slice(2)}`;
-      });
-      const values = pts.map(d => Math.round(d.p * 10000) / 10000);
-
-      const currVal  = values[values.length - 1];
-      const prevVal  = values[0];
-      const change   = currVal - prevVal;
-      const minVal   = Math.min(...values);
-      const maxVal   = Math.max(...values);
-
-      // Display raw values as returned by the API — no unit conversion
-      const fmt = v => parseFloat(v.toFixed(6)).toString();
-
-      const bodyEl = document.getElementById(`${pid}-body`);
-      if (!bodyEl) return;
-      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-
-      safeBadge(`${pid}-badge`, exchange.toUpperCase(), 'var(--accent)', 'var(--accent-dim)', '1px solid rgba(0,229,160,0.25)');
-
-      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-      const canvasEl = document.getElementById(`${pid}-canvas`);
-      if (!canvasEl) return;
-
-      chartInstances[pid] = new Chart(canvasEl, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [{
-            data: values,
-            borderColor: '#00e5a0',
-            borderWidth: 1.5,
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            fill: true,
-            backgroundColor: 'rgba(0,229,160,0.08)',
-            tension: 0.3
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 300 },
-          interaction: { mode: 'index', intersect: false },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              backgroundColor: '#161c24',
-              borderColor: 'rgba(255,255,255,0.1)',
-              borderWidth: 1,
-              titleColor: '#8a9099',
-              bodyColor: '#f0f2f5',
-              titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
-              bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
-              callbacks: {
-                label: (i) => ` Forecast: ${fmt(i.raw)}`
-              }
-            }
-          },
-          scales: {
-            x: {
-              grid: { color: 'rgba(255,255,255,0.04)' },
-              ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 },
-              border: { color: 'rgba(255,255,255,0.07)' }
-            },
-            y: {
-              min: minVal - Math.abs(minVal * 0.02),
-              max: maxVal + Math.abs(maxVal * 0.02),
-              grid: { color: 'rgba(255,255,255,0.04)' },
-              ticks: {
-                color: '#8a9099',
-                font: { family: "'IBM Plex Mono',monospace", size: 11 },
-                callback: v => fmt(v)
-              },
-              border: { color: 'rgba(255,255,255,0.07)' }
-            },
-            y2: {
-              position: 'right',
-              min: minVal - Math.abs(minVal * 0.02),
-              max: maxVal + Math.abs(maxVal * 0.02),
-              grid: { drawOnChartArea: false },
-              ticks: {
-                color: '#8a9099',
-                font: { family: "'IBM Plex Mono',monospace", size: 11 },
-                callback: v => fmt(v)
-              },
-              border: { color: 'rgba(255,255,255,0.07)' }
-            }
-          }
-        }
-      });
-
-      safeHTML(`${pid}-stats`, `
-        <div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div>
-        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '+' : ''}${fmt(change)}</div></div>
-        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmt(maxVal)}</div></div>
-        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmt(minVal)}</div></div>
-        <div class="stat" style="margin-left:auto;"><div class="stat-label">Source</div><div class="stat-value" style="font-size:11px;">${exchange.toUpperCase()}</div></div>`);
-
-    } catch(e) {
-      safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load forecast data.</div>');
-      console.error(e);
-    }
-  });
-}
-
-
+  populateFilters();
 </script>
+
 <div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none;">Info@OpenMindData.io</a></div>
 <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;&middot;&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none;">openminddata.io</a></div>
 </body>
