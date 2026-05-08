@@ -405,11 +405,15 @@
     const el = document.getElementById(id);
     if (!el) return;
     if (val === null) {
-      el.innerHTML = naCell();
+      el.textContent = '—';
+      el.className = 'td-num na';
     } else {
-      const encoded = JSON.stringify(key);
-      const colEnc  = JSON.stringify(colType);
-      el.innerHTML = '<span class="td-num clickable" onclick="toggleExpand(' + encoded + ',' + colEnc + ')">' + fmt4(val) + '</span>';
+      const span = document.createElement('span');
+      span.className = 'td-num clickable';
+      span.textContent = fmt4(val);
+      span.addEventListener('click', function() { toggleExpand(key, colType); });
+      el.innerHTML = '';
+      el.appendChild(span);
     }
   }
 
