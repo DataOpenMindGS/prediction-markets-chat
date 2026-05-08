@@ -206,6 +206,13 @@
 </div>
 
 <script>
+  window.onerror = function(msg, src, line, col, err) {
+    console.error('GLOBAL ERROR:', msg, 'src:', src, 'line:', line, 'col:', col, 'stack:', err && err.stack);
+    return false;
+  };
+  window.addEventListener('unhandledrejection', function(e) {
+    console.error('UNHANDLED PROMISE:', e.reason && e.reason.stack || e.reason);
+  });
   const API_BASE      = 'https://api.dataopenmind.com/public';
   const ECON_URL      = API_BASE + '/get_economic_stats';
   const KALSHI_FC     = API_BASE + '/get_kalshi_forecast';
