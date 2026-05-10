@@ -382,18 +382,31 @@
         (c.country_name || c.country) + '<br>' + (c.mapped_events_count || 0) + ' active markets'
       );
 
+      // Use log scale for shading so smaller countries still show color.
+      // Add 1 before log to handle zeros gracefully.
+      const zValues = counts.map(c => Math.log10(c + 1));
+      const nonUSCounts = countryData
+        .filter(c => c.country !== 'USA' && (c.mapped_events_count || 0) > 0)
+        .map(c => Math.log10((c.mapped_events_count || 0) + 1));
+      // Cap color scale at 95th percentile of non-US countries so US doesn't dominate
+      const sorted95   = [...nonUSCounts].sort((a,b) => a-b);
+      const cap95      = sorted95[Math.floor(sorted95.length * 0.95)] || 1;
+
       const data = [{
         type: 'choropleth',
         locationmode: 'country names',
         locations: locations,
-        z: counts,
+        z: zValues,
+        zmin: 0,
+        zmax: cap95,
         text: texts,
         hovertemplate: '%{text}<extra></extra>',
         colorscale: [
-          [0,   'rgba(0,229,160,0.08)'],
-          [0.2, 'rgba(0,229,160,0.25)'],
-          [0.5, 'rgba(0,229,160,0.55)'],
-          [1.0, 'rgba(0,229,160,0.95)']
+          [0,   'rgba(15,20,25,1)'],
+          [0.1, 'rgba(0,229,160,0.15)'],
+          [0.3, 'rgba(0,229,160,0.35)'],
+          [0.6, 'rgba(0,229,160,0.60)'],
+          [1.0, 'rgba(0,229,160,0.90)']
         ],
         showscale: false,
         marker: {
@@ -423,9 +436,10 @@
       };
 
       const config = {
-        responsive:    true,
-        displayModeBar: false,
-        scrollZoom:    false
+        responsive:     true,
+        displayModeBar: true,
+        modeBarButtonsToRemove: ['select2d','lasso2d','toImage','resetScale2d'],
+        scrollZoom:     true
       };
 
       Plotly.newPlot('world-map', data, layout, config);
@@ -630,7 +644,12 @@
 
   // ── Init ──────────────────────────────────────────────────────
   initMap();
-  loadFilterOptions();
+  loadFilterOptions().then(() => {
+    // Default: Politics & Government, active only
+    document.getElementById('f-category').value = 'Politics & Government';
+    updateSubcategories();
+    applyFilters();
+  });
 
   // ── Shared panel/chart helpers ────────────────────────────────
 
