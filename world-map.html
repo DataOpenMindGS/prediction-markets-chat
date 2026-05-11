@@ -727,11 +727,11 @@
 
       const countrySelect = document.getElementById('f-country');
       countries
-        .sort((a,b) => b.mapped_events_count - a.mapped_events_count)
+        .sort((a,b) => (b.mapped_events_count_active||0) - (a.mapped_events_count_active||0))
         .forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.country;
-          opt.textContent = `${c.country_name} (${c.mapped_events_count})`;
+          opt.textContent = `${c.country_name} (${c.mapped_events_count_active||0})`;
           countrySelect.appendChild(opt);
         });
 
@@ -801,6 +801,9 @@
         sortAndRender();
         document.getElementById('sort-wrap').style.display = 'flex';
       }
+      // Update map shading to reflect current category filter
+      const cat = document.getElementById('f-category').value;
+      drawMap(cat || null);
     } catch(e) { showState('error'); console.error(e); }
     finally { btn.disabled = false; btn.textContent = 'Apply Filters'; }
   }
