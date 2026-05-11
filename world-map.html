@@ -361,37 +361,104 @@
   const GET_MARKETS     = API_BASE + '/get_markets';
   const OMD_FORECAST    = API_BASE + '/get_omd_forecast';
 
-  let allMarkets  = [];
-  let categoryMap = [];
-  let countryData = [];   // [{country, country_name, mapped_events_count, iso3}]
+  let allMarkets    = [];
+  let categoryMap   = [];
+  let countryData   = [];   // [{country, country_name, mapped_events_count_active}]
+  let fullCatMap    = [];   // raw rows from get_category_map (has country field)
   let chartInstances = {};
   let selectedCountry = '';  // ISO2 code currently selected via map click
 
   // ── Map init ─────────────────────────────────────────────────
   async function initMap() {
     try {
-      const res  = await fetch(COUNTRY_MAP_URL);
-      countryData = await res.json();
+      // Load full category map which has country + counts per combination
+      const res   = await fetch(CATEGORY_MAP_URL);
+      fullCatMap  = await res.json();
 
-      // Plotly needs iso_alpha-3 codes. Our data has 2-letter codes.
-      // We'll map common ones; Plotly also accepts locationmode='country names'
-      // but ISO3 is more reliable. We'll use country names as fallback.
-      const locations = countryData.map(c => c.country_name || c.country);
-      const counts    = countryData.map(c => c.mapped_events_count_active || 0);
-      const texts     = countryData.map(c =>
-        (c.country_name || c.country) + '<br>' + (c.mapped_events_count_active || 0) + ' active markets'
-      );
+      // Also load country names from country map for display
+      const cntRes = await fetch(COUNTRY_MAP_URL);
+      countryData  = await cntRes.json();
 
-      // Use log scale for shading so smaller countries still show color.
-      // Add 1 before log to handle zeros gracefully.
-      const zValues = counts.map(c => Math.log10(c + 1));
-      const nonUSCounts = countryData
-        .filter(c => c.country !== 'USA' && (c.mapped_events_count_active || 0) > 0)
-        .map(c => Math.log10((c.mapped_events_count_active || 0) + 1));
-      // Cap color scale at 95th percentile of non-US countries so US doesn't dominate
-      const sorted95   = [...nonUSCounts].sort((a,b) => a-b);
-      const cap95      = sorted95[Math.floor(sorted95.length * 0.95)] || 1;
+      // Draw initial map with all categories
+      drawMap(null);
 
+      // Click handler
+      document.getElementById('world-map').on('plotly_click', function(eventData) {
+        if (!eventData || !eventData.points || !eventData.points.length) return;
+        const pt          = eventData.points[0];
+        const countryName = pt.location;
+        const match = countryData.find(c =>
+          (c.country_name || '').toLowerCase() === countryName.toLowerCase()
+        );
+        if (!match) return;
+        // Get active count for this country under current filter
+        const cat = document.getElementById('f-category').value;
+        const activeCount = getCountryCount(match.country, cat);
+        selectCountry(match.country, match.country_name, activeCount);
+      });
+
+    } catch(e) {
+      console.error('Map init error:', e);
+    }
+  }
+
+  // Aggregate fullCatMap by country, optionally filtered by category
+  function getCountryCounts(filterCategory) {
+    const agg = {};
+    fullCatMap.forEach(row => {
+      const ctry = row.country;
+      if (!ctry) return;
+      if (filterCategory && row.category !== filterCategory) return;
+      if (!agg[ctry]) agg[ctry] = 0;
+      agg[ctry] += (row.mapped_events_count_active || 0);
+    });
+    return agg;
+  }
+
+  function getCountryCount(countryCode, filterCategory) {
+    const agg = getCountryCounts(filterCategory || null);
+    return agg[countryCode] || 0;
+  }
+
+  // Draw or update the choropleth map
+  function drawMap(filterCategory) {
+    const agg = getCountryCounts(filterCategory);
+
+    const locations = [];
+    const counts    = [];
+    const texts     = [];
+
+    countryData.forEach(c => {
+      const cnt = agg[c.country] || 0;
+      locations.push(c.country_name || c.country);
+      counts.push(cnt);
+      const label = filterCategory ? filterCategory : 'all categories';
+      texts.push((c.country_name || c.country) + '<br>' + cnt + ' active markets (' + label + ')');
+    });
+
+    const zValues    = counts.map(c => Math.log10(c + 1));
+    const nonUSZ     = countryData
+      .filter(c => c.country !== 'USA')
+      .map(c => Math.log10((agg[c.country] || 0) + 1))
+      .filter(v => v > 0);
+    const sorted95   = [...nonUSZ].sort((a,b) => a-b);
+    const cap95      = sorted95[Math.floor(sorted95.length * 0.95)] || 1;
+
+    const mapEl = document.getElementById('world-map');
+    const isInitialized = mapEl && mapEl.data;
+
+    const traceData = {
+      locations: [locations],
+      z:         [zValues],
+      text:      [texts],
+      zmax:      [cap95]
+    };
+
+    if (isInitialized && mapEl.data.length > 0) {
+      // Update existing map data without full re-render
+      Plotly.restyle('world-map', traceData, [0]);
+    } else {
+      // Initial render
       const data = [{
         type: 'choropleth',
         locationmode: 'country names',
@@ -409,56 +476,29 @@
           [1.0, 'rgba(0,229,160,0.90)']
         ],
         showscale: false,
-        marker: {
-          line: { color: 'rgba(255,255,255,0.15)', width: 0.5 }
-        }
+        marker: { line: { color: 'rgba(255,255,255,0.15)', width: 0.5 } }
       }];
-
       const layout = {
         paper_bgcolor: 'rgba(0,0,0,0)',
         plot_bgcolor:  'rgba(0,0,0,0)',
         margin: { l:0, r:0, t:0, b:0 },
         geo: {
-          showframe:       false,
-          showcoastlines:  true,
-          coastlinecolor:  'rgba(255,255,255,0.1)',
-          showland:        true,
-          landcolor:       '#1d2630',
-          showocean:       true,
-          oceancolor:      '#0f1419',
-          showlakes:       false,
-          showrivers:      false,
-          showcountries:   true,
-          countrycolor:    'rgba(255,255,255,0.1)',
-          bgcolor:         'rgba(0,0,0,0)',
+          showframe: false, showcoastlines: true,
+          coastlinecolor: 'rgba(255,255,255,0.1)',
+          showland: true, landcolor: '#1d2630',
+          showocean: true, oceancolor: '#0f1419',
+          showlakes: false, showrivers: false,
+          showcountries: true, countrycolor: 'rgba(255,255,255,0.1)',
+          bgcolor: 'rgba(0,0,0,0)',
           projection: { type: 'natural earth' }
         }
       };
-
       const config = {
-        responsive:     true,
-        displayModeBar: true,
+        responsive: true, displayModeBar: true,
         modeBarButtonsToRemove: ['select2d','lasso2d','toImage','resetScale2d'],
-        scrollZoom:     true
+        scrollZoom: true
       };
-
       Plotly.newPlot('world-map', data, layout, config);
-
-      // Click handler
-      document.getElementById('world-map').on('plotly_click', function(eventData) {
-        if (!eventData || !eventData.points || !eventData.points.length) return;
-        const pt          = eventData.points[0];
-        const countryName = pt.location;
-        // Find matching country code from our data
-        const match = countryData.find(c =>
-          (c.country_name || '').toLowerCase() === countryName.toLowerCase()
-        );
-        if (!match) return;
-        selectCountry(match.country, match.country_name, match.mapped_events_count_active);
-      });
-
-    } catch(e) {
-      console.error('Map init error:', e);
     }
   }
 
@@ -512,7 +552,10 @@
         catSelect.appendChild(opt);
       });
 
-      catSelect.addEventListener('change', updateSubcategories);
+      catSelect.addEventListener('change', function() {
+        updateSubcategories();
+        drawMap(catSelect.value || null);
+      });
       document.getElementById('f-subcategory').addEventListener('change', updateFurtherSubs);
 
     } catch(e) { console.error('Filter load error:', e); }
@@ -601,6 +644,7 @@
     showState('initial');
     document.getElementById('sort-wrap').style.display = 'none';
     document.getElementById('results-count').textContent = 'Click a country on the map or use filters below';
+    drawMap(null);  // reset map shading to all categories
   }
 
   function sortAndRender() {
