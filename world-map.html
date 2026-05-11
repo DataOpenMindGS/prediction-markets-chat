@@ -377,17 +377,17 @@
       // We'll map common ones; Plotly also accepts locationmode='country names'
       // but ISO3 is more reliable. We'll use country names as fallback.
       const locations = countryData.map(c => c.country_name || c.country);
-      const counts    = countryData.map(c => c.mapped_events_count || 0);
+      const counts    = countryData.map(c => c.mapped_events_count_active || 0);
       const texts     = countryData.map(c =>
-        (c.country_name || c.country) + '<br>' + (c.mapped_events_count || 0) + ' active markets'
+        (c.country_name || c.country) + '<br>' + (c.mapped_events_count_active || 0) + ' active markets'
       );
 
       // Use log scale for shading so smaller countries still show color.
       // Add 1 before log to handle zeros gracefully.
       const zValues = counts.map(c => Math.log10(c + 1));
       const nonUSCounts = countryData
-        .filter(c => c.country !== 'USA' && (c.mapped_events_count || 0) > 0)
-        .map(c => Math.log10((c.mapped_events_count || 0) + 1));
+        .filter(c => c.country !== 'USA' && (c.mapped_events_count_active || 0) > 0)
+        .map(c => Math.log10((c.mapped_events_count_active || 0) + 1));
       // Cap color scale at 95th percentile of non-US countries so US doesn't dominate
       const sorted95   = [...nonUSCounts].sort((a,b) => a-b);
       const cap95      = sorted95[Math.floor(sorted95.length * 0.95)] || 1;
@@ -454,7 +454,7 @@
           (c.country_name || '').toLowerCase() === countryName.toLowerCase()
         );
         if (!match) return;
-        selectCountry(match.country, match.country_name, match.mapped_events_count);
+        selectCountry(match.country, match.country_name, match.mapped_events_count_active);
       });
 
     } catch(e) {
@@ -499,7 +499,7 @@
         .forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.country;
-          opt.textContent = (c.country_name || c.country) + ' (' + (c.mapped_events_count||0) + ')';
+          opt.textContent = (c.country_name || c.country) + ' (' + (c.mapped_events_count_active||0) + ')';
           countrySelect.appendChild(opt);
         });
 
