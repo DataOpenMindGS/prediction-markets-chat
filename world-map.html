@@ -447,13 +447,13 @@
         hovertemplate: '%{text}<extra></extra>',
         colorscale: [
           [0,   'rgba(15,20,25,1)'],
-          [0.1, 'rgba(0,229,160,0.15)'],
-          [0.3, 'rgba(0,229,160,0.35)'],
-          [0.6, 'rgba(0,229,160,0.60)'],
-          [1.0, 'rgba(0,229,160,0.90)']
+          [0.1, 'rgba(77,166,255,0.20)'],
+          [0.3, 'rgba(77,166,255,0.45)'],
+          [0.6, 'rgba(77,166,255,0.70)'],
+          [1.0, 'rgba(77,166,255,0.95)']
         ],
         showscale: false,
-        marker: { line: { color: 'rgba(255,255,255,0.15)', width: 0.5 } }
+        marker: { line: { color: 'rgba(255,255,255,0.5)', width: 0.8 } }
       }];
       const layout = {
         paper_bgcolor: 'rgba(0,0,0,0)',
@@ -465,7 +465,7 @@
           showland: true, landcolor: '#1d2630',
           showocean: true, oceancolor: '#0f1419',
           showlakes: false, showrivers: false,
-          showcountries: true, countrycolor: 'rgba(255,255,255,0.1)',
+          showcountries: true, countrycolor: 'rgba(255,255,255,0.35)',
           bgcolor: 'rgba(0,0,0,0)',
           projection: { type: 'equirectangular', scale: 1.35 }
         }
