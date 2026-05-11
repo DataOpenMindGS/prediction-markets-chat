@@ -514,7 +514,7 @@
 
       const countrySelect = document.getElementById('f-country');
       countries
-        .sort((a,b) => (b.mapped_events_count||0) - (a.mapped_events_count||0))
+        .sort((a,b) => (b.mapped_events_count_active||0) - (a.mapped_events_count_active||0))
         .forEach(c => {
           const opt = document.createElement('option');
           opt.value = c.country;
@@ -603,6 +603,8 @@
       }
       sortAndRender();
       document.getElementById('sort-wrap').style.display = 'flex';
+      // Update map shading to reflect current category filter
+      drawMap(category || null);
     } catch(e) {
       showState('error', e.message);
     } finally {
@@ -1435,15 +1437,8 @@ async function showMarketsPanel(marketId, eventId, btn) {
   });
 } 
 
-  // ── Init ────────────────────────────────────────────
-  async function init() {
-    await loadFilterOptions();
-    // Default load: Active markets, min $10k volume, sorted by volume
-    document.getElementById('f-active').value  = '1';
-    document.getElementById('f-volume').value  = '10000';
-    await applyFilters();
-  }
-  init();
+  // ── Init (disabled — world-map has its own init) ────
+  // async function init() { ... } — suppressed to avoid duplicate filter population
 
 
   // ── 📈 FORECAST PANEL ──────────────────────────────────
