@@ -305,7 +305,7 @@
       </div>
       <div class="filter-group" style="max-width:180px;">
         <div class="filter-label">Min Volume ($)</div>
-        <input type="number" id="f-volume" placeholder="e.g. 10000" min="0" step="1000">
+        <input type="number" id="f-volume" placeholder="e.g. 1000" min="0" step="100" value="1">
       </div>
       <div class="filter-actions">
         <button class="btn-apply" id="btn-apply" onclick="applyFilters()">Apply Filters</button>
@@ -644,12 +644,7 @@
 
   // ── Init ──────────────────────────────────────────────────────
   initMap();
-  loadFilterOptions().then(() => {
-    // Default: Politics & Government, active only
-    document.getElementById('f-category').value = 'Politics & Government';
-    updateSubcategories();
-    applyFilters();
-  });
+  loadFilterOptions();
 
   // ── Shared panel/chart helpers ────────────────────────────────
 
