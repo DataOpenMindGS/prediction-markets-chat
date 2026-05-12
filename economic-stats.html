@@ -1082,9 +1082,16 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       trEx.appendChild(tdEx);
       tbody.appendChild(trEx);
 
-      // Load forecasts for this row
-      loadTableRowForecasts(evt, sk);
     });
+
+    // Load forecasts sequentially to avoid rate limiting
+    (async () => {
+      for (const evt of sorted) {
+        const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+        await loadTableRowForecasts(evt, sk);
+        await new Promise(r => setTimeout(r, 120));
+      }
+    })();
   }
 
   function exchBadges(evt) {
