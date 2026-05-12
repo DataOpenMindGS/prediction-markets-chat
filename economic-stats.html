@@ -1039,8 +1039,8 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
     const tbody = document.getElementById('econ-tbody');
     tbody.innerHTML = '';
     tableExpandedRows = new Set();
+    tableChartInstances = {};
 
-    // Group same way as calendar: unique event_id rows, sorted by year desc, month asc
     const sorted = [...data].sort((a, b) => {
       if ((b.reference_year||0) !== (a.reference_year||0)) return (b.reference_year||0) - (a.reference_year||0);
       return (a.reference_month||0) - (b.reference_month||0);
@@ -1048,6 +1048,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
 
     sorted.forEach(evt => {
       const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+      tableChartInstances[sk] = { evt };
       const period = evt.reference_month
         ? MONTH_NAMES_FULL[(evt.reference_month-1)] + ' ' + evt.reference_year
         : (evt.reference_year || '—');
@@ -1056,16 +1057,16 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       tr.id = 'trow-' + sk;
       tr.className = 'data-row';
       tr.innerHTML =
-        '<td class="tbl-td dim">' + escapeHTML(evt.omd_country || '') + '</td>' +
-        '<td class="tbl-td">' + escapeHTML(evt.omd_metric || '') + '</td>' +
-        '<td class="tbl-td dim">' + escapeHTML(evt.omd_metric_flavor || '') + '</td>' +
+        '<td class="tbl-td dim">' + escapeHTML(evt.omd_country||'') + '</td>' +
+        '<td class="tbl-td">' + escapeHTML(evt.omd_metric||'') + '</td>' +
+        '<td class="tbl-td dim">' + escapeHTML(evt.omd_metric_flavor||'') + '</td>' +
         '<td class="tbl-td dim">' + escapeHTML(String(period)) + '</td>' +
         '<td class="tbl-td" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(evt.event_title||'') + '">' + escapeHTML(evt.event_title||'') + '</td>' +
-        '<td class="tbl-td">' + exchBadges(evt) + '</td>' +
-        '<td class="tbl-td num na-val" id="tv-kalshi-' + sk + '"><span class="tbl-spinner"></span></td>' +
-        '<td class="tbl-td num na-val" id="tv-omdk-'   + sk + '"><span class="tbl-spinner"></span></td>' +
-        '<td class="tbl-td num na-val" id="tv-omdpm-'  + sk + '"><span class="tbl-spinner"></span></td>' +
-        '<td class="tbl-td num na-val" id="tv-omdfx-'  + sk + '"><span class="tbl-spinner"></span></td>';
+        '<td class="tbl-td"><span class="tbl-exch">' + (evt.exchange||'').toUpperCase().slice(0,2) + '</span></td>' +
+        '<td class="tbl-td num" id="tv-kalshi-' + sk + '"><span class="tbl-spinner"></span></td>' +
+        '<td class="tbl-td num" id="tv-omdk-'   + sk + '"><span class="tbl-spinner"></span></td>' +
+        '<td class="tbl-td num" id="tv-omdpm-'  + sk + '"><span class="tbl-spinner"></span></td>' +
+        '<td class="tbl-td num" id="tv-omdfx-'  + sk + '"><span class="tbl-spinner"></span></td>';
       tbody.appendChild(tr);
 
       // Expand row for charts
@@ -1081,110 +1082,107 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       tdEx.appendChild(inner);
       trEx.appendChild(tdEx);
       tbody.appendChild(trEx);
-
     });
 
-    // Load forecasts sequentially to avoid rate limiting
-    (async () => {
-      for (const evt of sorted) {
-        const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
-        await loadTableRowForecasts(evt, sk);
-        await new Promise(r => setTimeout(r, 150));
-      }
-    })();
-  }
-
-  function exchBadges(evt) {
-    return '<span class="tbl-exch">' + (evt.exchange || 'N/A').toUpperCase().slice(0,2) + '</span>';
+    // Batch load latest values — one call per exchange type
+    loadTableValuesBatched(sorted);
   }
 
   function fmt4(v) { return v != null ? parseFloat(Number(v).toFixed(4)).toString() : null; }
 
-  function setTableCell(id, val, evtForClick, colType, sk) {
+  function setTableCell(id, val, sk) {
     const el = document.getElementById(id);
     if (!el) return;
     if (val == null) {
       el.innerHTML = '<span style="color:var(--bg4)">—</span>';
-      el.className = 'tbl-td num na-val';
     } else {
       const span = document.createElement('span');
-      span.className = 'clickable-val';
+      span.style.cssText = 'cursor:pointer;color:var(--accent);text-decoration:underline;text-underline-offset:3px;text-decoration-style:dotted;font-family:var(--mono);font-size:12px;font-weight:500;';
       span.textContent = fmt4(val);
-      span.style.cssText = 'cursor:pointer;color:var(--accent);text-decoration:underline;text-underline-offset:3px;text-decoration-style:dotted;';
-      span.addEventListener('click', () => toggleTableExpand(sk, evtForClick));
+      span.addEventListener('click', () => toggleTableExpand(sk));
       el.innerHTML = '';
       el.appendChild(span);
-      el.className = 'tbl-td num';
     }
   }
 
-  async function loadTableRowForecasts(evt, sk) {
-    const isKalshi = (evt.exchange || '').toLowerCase() === 'kalshi';
-    const isPM     = (evt.exchange || '').toLowerCase() === 'polymarket';
-    const isFX     = (evt.exchange || '').toLowerCase() === 'forecastex';
-    const delay    = ms => new Promise(r => setTimeout(r, ms));
+  // ── Batched value loading — endpoint_only=true for speed ─────────────────
+  async function loadTableValuesBatched(sorted) {
+    const kalshiEvts = sorted.filter(e => (e.exchange||'').toLowerCase() === 'kalshi');
+    const pmEvts     = sorted.filter(e => (e.exchange||'').toLowerCase() === 'polymarket');
+    const fxEvts     = sorted.filter(e => (e.exchange||'').toLowerCase() === 'forecastex');
 
-    if (!tableChartInstances[sk]) tableChartInstances[sk] = {};
-    const fc = tableChartInstances[sk];
-
-    // All 4 calls sequential within the row to stay under rate limit
-
-    // 1. Kalshi published forecast
-    if (isKalshi && evt.is_forecast_market) {
+    // Helper: one batched OMD call for a group
+    async function batchOmd(evts, colPrefix) {
+      if (!evts.length) return;
+      const ids = evts.map(e => 'event_id=' + encodeURIComponent(e.event_id)).join('&');
       try {
-        const rawId = evt.event_id.replace(/^ka_/i, '');
-        const now = Math.floor(Date.now()/1000);
+        const res  = await fetch(OMD_FORECAST + '?' + ids + '&endpoint_only=true');
+        const data = await res.json();
+        const list = data.forecasts || (data.event_id ? [data] : []);
+        list.forEach(fc => {
+          const sk = fc.event_id.replace(/[^a-z0-9]/gi, '_');
+          if (tableChartInstances[sk]) {
+            tableChartInstances[sk][colPrefix + 'Val']    = fc.latest_p;
+            tableChartInstances[sk][colPrefix + 'Method'] = fc.calc_method;
+          }
+          setTableCell('tv-' + colPrefix + '-' + sk, fc.latest_p, sk);
+        });
+      } catch(e) {
+        evts.forEach(evt => {
+          const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+          setTableCell('tv-' + colPrefix + '-' + sk, null, sk);
+        });
+      }
+    }
+
+    // Kalshi published forecast — still per-row since it hits external Kalshi API
+    // but only for is_forecast_market events
+    const kalshiFcEvts = kalshiEvts.filter(e => e.is_forecast_market);
+    kalshiEvts.forEach(evt => {
+      if (!evt.is_forecast_market) {
+        const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+        setTableCell('tv-kalshi-' + sk, null, sk);
+      }
+    });
+    for (const evt of kalshiFcEvts) {
+      const sk    = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+      const rawId = evt.event_id.replace(/^ka_/i, '');
+      try {
+        const now  = Math.floor(Date.now()/1000);
         const nowH = Math.floor(now/3600)*3600;
-        const res = await fetch(API_BASE + '/get_kalshi_forecast?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + (nowH-90*86400) + '&end_ts=' + nowH + '&period_interval=60');
+        const res  = await fetch(API_BASE + '/get_kalshi_forecast?event_id=' + encodeURIComponent(rawId) +
+          '&start_ts=' + (nowH - 90*86400) + '&end_ts=' + nowH + '&period_interval=60');
         const data = await res.json();
-        const hist = (data.history||[]).filter(p=>p.p!=null);
-        fc.kalshiHist = hist;
-        fc.kalshiVal  = hist.length ? hist[hist.length-1].p : null;
-      } catch(e) { fc.kalshiVal = null; fc.kalshiHist = []; }
-    } else { fc.kalshiVal = null; fc.kalshiHist = []; }
-    setTableCell('tv-kalshi-'+sk, fc.kalshiVal, evt, 'kalshi', sk);
-    await delay(50);
+        const hist = (data.history||[]).filter(p => p.p != null);
+        const val  = hist.length ? hist[hist.length-1].p : null;
+        if (tableChartInstances[sk]) {
+          tableChartInstances[sk].kalshiFcHist = hist;
+          tableChartInstances[sk].kalshiVal    = val;
+        }
+        setTableCell('tv-kalshi-' + sk, val, sk);
+      } catch(e) {
+        setTableCell('tv-kalshi-' + sk, null, sk);
+      }
+      await new Promise(r => setTimeout(r, 150));
+    }
 
-    // 2. OMD Kalshi
-    if (isKalshi) {
-      try {
-        const res = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
-        const data = await res.json();
-        const hist = (data.history||[]).filter(p=>p.p!=null);
-        fc.omdKHist = hist; fc.omdKMethod = data.calc_method;
-        fc.omdKVal  = hist.length ? hist[hist.length-1].p : null;
-      } catch(e) { fc.omdKVal = null; fc.omdKHist = []; }
-    } else { fc.omdKVal = null; fc.omdKHist = []; }
-    setTableCell('tv-omdk-'+sk, fc.omdKVal, evt, 'omdk', sk);
-    await delay(50);
+    // OMD batch calls — one per exchange, all events at once
+    await batchOmd(kalshiEvts, 'omdk');
+    await batchOmd(pmEvts,     'omdpm');
+    await batchOmd(fxEvts,     'omdfx');
 
-    // 3. OMD Polymarket
-    if (isPM) {
-      try {
-        const res = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
-        const data = await res.json();
-        const hist = (data.history||[]).filter(p=>p.p!=null);
-        fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method;
-        fc.omdPMVal  = hist.length ? hist[hist.length-1].p : null;
-      } catch(e) { fc.omdPMVal = null; fc.omdPMHist = []; }
-    } else { fc.omdPMVal = null; fc.omdPMHist = []; }
-    setTableCell('tv-omdpm-'+sk, fc.omdPMVal, evt, 'omdpm', sk);
-    await delay(50);
-
-    // 4. OMD ForecastEx
-    if (isFX) {
-      try {
-        const res = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
-        const data = await res.json();
-        const hist = (data.history||[]).filter(p=>p.p!=null);
-        fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method;
-        fc.omdFXVal  = hist.length ? hist[hist.length-1].p : null;
-      } catch(e) { fc.omdFXVal = null; fc.omdFXHist = []; }
-    } else { fc.omdFXVal = null; fc.omdFXHist = []; }
-    setTableCell('tv-omdfx-'+sk, fc.omdFXVal, evt, 'omdfx', sk);
+    // Null out columns for exchanges not applicable
+    sorted.forEach(evt => {
+      const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+      const exch = (evt.exchange||'').toLowerCase();
+      if (exch !== 'kalshi')     setTableCell('tv-omdk-'  + sk, null, sk);
+      if (exch !== 'polymarket') setTableCell('tv-omdpm-' + sk, null, sk);
+      if (exch !== 'forecastex') setTableCell('tv-omdfx-' + sk, null, sk);
+    });
   }
 
-  function toggleTableExpand(sk, evt) {
+  // ── Expand row — load full history on demand ──────────────────────────────
+  function toggleTableExpand(sk) {
     const trEx  = document.getElementById('texpand-' + sk);
     const inner = document.getElementById('texpand-inner-' + sk);
     if (!trEx || !inner) return;
@@ -1195,18 +1193,56 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
     }
     tableExpandedRows.add(sk);
     trEx.style.display = '';
-    renderTableCharts(sk, evt);
+    inner.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--text3);">Loading forecast history...</div>';
+    loadTableRowHistory(sk);
   }
 
-  function renderTableCharts(sk, evt) {
+  async function loadTableRowHistory(sk) {
+    const fc  = tableChartInstances[sk] || {};
+    const evt = fc.evt;
+    if (!evt) return;
+
+    const isKalshi = (evt.exchange||'').toLowerCase() === 'kalshi';
+    const isPM     = (evt.exchange||'').toLowerCase() === 'polymarket';
+    const isFX     = (evt.exchange||'').toLowerCase() === 'forecastex';
+
+    // Load full history for the applicable OMD column
+    if (isKalshi || isPM || isFX) {
+      try {
+        const res  = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
+        const data = await res.json();
+        const hist = (data.history||[]).filter(p => p.p != null);
+        if (isKalshi)  { fc.omdKHist  = hist; fc.omdKMethod  = data.calc_method; }
+        if (isPM)      { fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method; }
+        if (isFX)      { fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method; }
+      } catch(e) {}
+    }
+
+    // Kalshi published history (already loaded if is_forecast_market)
+    if (isKalshi && evt.is_forecast_market && !fc.kalshiFcHist) {
+      try {
+        const rawId = evt.event_id.replace(/^ka_/i, '');
+        const now   = Math.floor(Date.now()/1000);
+        const nowH  = Math.floor(now/3600)*3600;
+        const res   = await fetch(API_BASE + '/get_kalshi_forecast?event_id=' + encodeURIComponent(rawId) +
+          '&start_ts=' + (nowH-90*86400) + '&end_ts=' + nowH + '&period_interval=60');
+        const data  = await res.json();
+        fc.kalshiFcHist = (data.history||[]).filter(p => p.p != null);
+      } catch(e) { fc.kalshiFcHist = []; }
+    }
+
+    renderTableCharts(sk);
+  }
+
+  function renderTableCharts(sk) {
     const inner = document.getElementById('texpand-inner-' + sk);
     const fc    = tableChartInstances[sk] || {};
 
     const series = [
-      { label:'Kalshi Published',  hist:fc.kalshiHist, color:'#4da6ff', method:null },
-      { label:'OMD (Kalshi)',      hist:fc.omdKHist,   color:'#00e5a0', method:fc.omdKMethod },
-      { label:'OMD (Polymarket)',  hist:fc.omdPMHist,  color:'#f0a500', method:fc.omdPMMethod },
-      { label:'OMD (ForecastEx)',  hist:fc.omdFXHist,  color:'#a78bfa', method:fc.omdFXMethod },
+      { label:'Kalshi Published',  hist:fc.kalshiFcHist, color:'#4da6ff', method:null },
+      { label:'OMD (Kalshi)',      hist:fc.omdKHist,     color:'#00e5a0', method:fc.omdKMethod },
+      { label:'OMD (Polymarket)',  hist:fc.omdPMHist,    color:'#f0a500', method:fc.omdPMMethod },
+      { label:'OMD (ForecastEx)',  hist:fc.omdFXHist,    color:'#a78bfa', method:fc.omdFXMethod },
     ].filter(s => s.hist && s.hist.length);
 
     if (!series.length) {
