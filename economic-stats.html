@@ -1143,7 +1143,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       } catch(e) { fc.kalshiVal = null; fc.kalshiHist = []; }
     } else { fc.kalshiVal = null; fc.kalshiHist = []; }
     setTableCell('tv-kalshi-'+sk, fc.kalshiVal, evt, 'kalshi', sk);
-    await delay(100);
+    await delay(50);
 
     // 2. OMD Kalshi
     if (isKalshi) {
@@ -1156,7 +1156,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       } catch(e) { fc.omdKVal = null; fc.omdKHist = []; }
     } else { fc.omdKVal = null; fc.omdKHist = []; }
     setTableCell('tv-omdk-'+sk, fc.omdKVal, evt, 'omdk', sk);
-    await delay(100);
+    await delay(50);
 
     // 3. OMD Polymarket
     if (isPM) {
@@ -1169,7 +1169,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       } catch(e) { fc.omdPMVal = null; fc.omdPMHist = []; }
     } else { fc.omdPMVal = null; fc.omdPMHist = []; }
     setTableCell('tv-omdpm-'+sk, fc.omdPMVal, evt, 'omdpm', sk);
-    await delay(100);
+    await delay(50);
 
     // 4. OMD ForecastEx
     if (isFX) {
