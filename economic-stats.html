@@ -399,6 +399,7 @@
         <a href="ai-search.html">AI SEARCH</a>
         <a href="text-search.html">TEXT SEARCH</a>
         <a href="explorer.html">EXPLORER</a>
+        <a href="world-map.html">WORLD MAP</a>
         <a href="companies.html">COMPANY MARKETS</a>
         <a href="earnings.html">EARNINGS</a>
         <a href="economic-stats.html" class="active">ECONOMIC STATS</a>
@@ -591,12 +592,9 @@
         }
       } else {
         const mo = d.reference_month;
-        // Keep best per month
-        const cur = byYear[yr].months[mo];
-        if (!cur || (!cur.is_forecast_market && d.is_forecast_market) ||
-            (cur.is_forecast_market === d.is_forecast_market && (d.event_volume||0) > (cur.event_volume||0))) {
-          byYear[yr].months[mo] = d;
-        }
+        // Collect ALL events per month (shown stacked in cell)
+        if (!byYear[yr].months[mo]) byYear[yr].months[mo] = [];
+        byYear[yr].months[mo].push(d);
       }
     });
 
@@ -624,8 +622,8 @@
           const grid = document.createElement('div');
           grid.className = 'month-grid';
           for (let mo = (hi * 6) + 1; mo <= (hi * 6) + 6; mo++) {
-            const event = byYear[yr].months[mo];
-            grid.appendChild(buildCell(event || null, MONTH_NAMES[mo - 1]));
+            const events = byYear[yr].months[mo] || null;
+            grid.appendChild(buildCell(events, MONTH_NAMES[mo - 1]));
           }
           section.appendChild(grid);
         });
@@ -636,101 +634,105 @@
   }
 
   // ── Build a single month cell ───────────────────────────────────
-  function buildCell(event, label) {
+  function buildCell(events, label) {
     const cell = document.createElement('div');
-    cell.className = event ? 'month-cell has-event' : 'month-cell empty';
+    // events can be null (empty month), a single object (annual), or an array
+    const eventList = !events ? [] : Array.isArray(events) ? events : [events];
+    cell.className = eventList.length ? 'month-cell has-event' : 'month-cell empty';
 
     const lbl = document.createElement('div');
     lbl.className = 'month-label';
     lbl.textContent = label;
     cell.appendChild(lbl);
 
-    if (!event) return cell;
+    if (!eventList.length) return cell;
 
-    // Exchange badge
-    if (event.exchange) {
-      const exch = document.createElement('div');
-      exch.className = 'cell-exchange';
-      exch.textContent = event.exchange.toUpperCase().slice(0, 2);
-      cell.appendChild(exch);
-    }
+    // Render each event as a sub-card inside the cell
+    eventList.forEach((event, idx) => {
+      const subCard = document.createElement('div');
+      subCard.style.cssText = idx > 0
+        ? 'border-top:1px solid var(--border);padding-top:6px;margin-top:4px;'
+        : '';
 
-    // Title
-    const title = document.createElement('div');
-    title.className = 'cell-title';
-    title.textContent = event.top_market_subtitle || event.event_title;
-    cell.appendChild(title);
+      // Label: metric + flavor (if multiple events) or subtitle
+      const titleEl = document.createElement('div');
+      titleEl.className = 'cell-title';
+      const metricLabel = [event.omd_metric, event.omd_metric_flavor].filter(Boolean).join(' · ');
+      titleEl.textContent = metricLabel || event.top_market_subtitle || event.event_title;
+      subCard.appendChild(titleEl);
 
-    // Value placeholder — will be updated by loadForecasts
-    const valEl = document.createElement('div');
-    valEl.className = 'cell-value na';
-    valEl.id = 'cell-val-' + event.event_id.replace(/[^a-z0-9]/gi, '_');
-    if (event.top_market_last_price != null) {
-      const p = event.top_market_last_price;
-      const pct = Math.round(p * 100) + '%';
-      valEl.className = 'cell-value ' + (p > 0.65 ? 'price-high' : p < 0.40 ? 'price-low' : 'price-mid');
-      valEl.textContent = pct;
-    } else {
-      valEl.textContent = '—';
-    }
-    if (event.is_forecast_market) {
-      valEl.innerHTML = '<span class="cell-loading"></span>';
-    }
-    cell.appendChild(valEl);
-
-    // Action buttons
-    const actions = document.createElement('div');
-    actions.className = 'cell-actions';
-
-    const isPolymarket = (event.exchange || '').toLowerCase() === 'polymarket';
-    const isKalshi     = (event.exchange || '').toLowerCase() === 'kalshi';
-    const marketId     = event.top_market_id;
-    const conditionId  = event.top_market_condition_id;
-    const tokenId      = event.top_market_token_id;
-
-    // We need a market-card wrapper for panel functions to work
-    // Wrap cell in a market-card div that panel functions can find
-    cell.dataset.marketId    = marketId || '';
-    cell.dataset.exchange    = event.exchange || '';
-    cell.dataset.eventId     = event.event_id || '';
-    cell.dataset.conditionId = conditionId || '';
-    cell.dataset.tokenId     = tokenId || '';
-
-    function addBtn(label, fn) {
-      const b = document.createElement('button');
-      b.className = 'cell-btn';
-      b.textContent = label;
-      b.onclick = fn;
-      actions.appendChild(b);
-    }
-
-    if (marketId) {
-      addBtn('📈 Price', () => showPriceChartFromCell(cell, event));
-      if (isPolymarket && conditionId) {
-        addBtn('📊 Vol',     () => showVolumePanelFromCell(cell, event));
-        addBtn('📐 OI',      () => showOIPanelFromCell(cell, event));
-        addBtn('🔄 Trades',  () => showTradesPanelFromCell(cell, event));
+      // Exchange badge
+      if (event.exchange) {
+        const exch = document.createElement('span');
+        exch.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--text3);letter-spacing:0.06em;margin-left:4px;';
+        exch.textContent = event.exchange.toUpperCase().slice(0, 2);
+        titleEl.appendChild(exch);
       }
-      if (isPolymarket && tokenId) {
-        addBtn('📖 Book', () => showOrderbookFromCell(cell, event));
+
+      // Value placeholder
+      const valEl = document.createElement('div');
+      valEl.className = 'cell-value na';
+      valEl.id = 'cell-val-' + event.event_id.replace(/[^a-z0-9]/gi, '_');
+      if (event.top_market_last_price != null) {
+        const p = event.top_market_last_price;
+        valEl.className = 'cell-value ' + (p > 0.65 ? 'price-high' : p < 0.40 ? 'price-low' : 'price-mid');
+        valEl.textContent = Math.round(p * 100) + '%';
+      } else {
+        valEl.textContent = '—';
       }
-      if (isKalshi && marketId) {
-        const ticker = marketId.replace(/^ka_/i, '');
-        addBtn('🔄 Trades', () => showKalshiTradesPanelFromCell(cell, event, ticker));
-        addBtn('📖 Book',   () => showKalshiOrderbookFromCell(cell, event, ticker));
+      if (event.is_forecast_market) {
+        valEl.innerHTML = '<span class="cell-loading"></span>';
       }
-      if (event.event_id) {
-        addBtn('🗂 Markets', () => showMarketsPanelFromCell(cell, event));
+      subCard.appendChild(valEl);
+
+      // Action buttons
+      const actions = document.createElement('div');
+      actions.className = 'cell-actions';
+
+      const isPolymarket = (event.exchange || '').toLowerCase() === 'polymarket';
+      const isKalshi     = (event.exchange || '').toLowerCase() === 'kalshi';
+      const marketId     = event.top_market_id;
+      const conditionId  = event.top_market_condition_id;
+      const tokenId      = event.top_market_token_id;
+
+      function addBtn(btnLabel, fn) {
+        const b = document.createElement('button');
+        b.className = 'cell-btn';
+        b.textContent = btnLabel;
+        b.addEventListener('click', fn);
+        actions.appendChild(b);
       }
-      if (event.is_forecast_market && event.event_id) {
-        const rawId = event.event_id.replace(/^pm_|^ka_/i, '');
-        addBtn('📈 Forecast', () => showForecastPanelFromCell(cell, event, rawId));
+
+      if (marketId) {
+        addBtn('📈 Price', () => showPriceChartFromCell(cell, event));
+        if (isPolymarket && conditionId) {
+          addBtn('📊 Vol',    () => showVolumePanelFromCell(cell, event));
+          addBtn('📐 OI',     () => showOIPanelFromCell(cell, event));
+          addBtn('🔄 Trades', () => showTradesPanelFromCell(cell, event));
+        }
+        if (isPolymarket && tokenId) {
+          addBtn('📖 Book', () => showOrderbookFromCell(cell, event));
+        }
+        if (isKalshi && marketId) {
+          const ticker = marketId.replace(/^ka_/i, '');
+          addBtn('🔄 Trades', () => showKalshiTradesPanelFromCell(cell, event, ticker));
+          addBtn('📖 Book',   () => showKalshiOrderbookFromCell(cell, event, ticker));
+        }
+        if (event.event_id) {
+          addBtn('🗂 Markets', () => showMarketsPanelFromCell(cell, event));
+        }
+        if (event.is_forecast_market && event.event_id) {
+          const rawId = event.event_id.replace(/^pm_|^ka_/i, '');
+          addBtn('📈 Forecast', () => showForecastPanelFromCell(cell, event, rawId));
+        }
+        if (event.event_id) {
+          addBtn('📊 OMD', () => showOmdForecastPanelFromCell(cell, event));
+        }
       }
-      if (event.event_id) {
-        addBtn('📊 OMD Forecast', () => showOmdForecastPanelFromCell(cell, event));
-      }
-    }
-    cell.appendChild(actions);
+      subCard.appendChild(actions);
+      cell.appendChild(subCard);
+    });
+
     return cell;
   }
 
