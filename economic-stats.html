@@ -361,6 +361,36 @@
 .state-sub { font-size:12px; color:var(--text3); max-width:300px; line-height:1.6; }
 .spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
 
+/* ── View toggle ── */
+.view-btn { background:var(--bg3); border:1px solid var(--border2); border-radius:6px; padding:4px 10px; font-family:var(--mono); font-size:10px; color:var(--text2); cursor:pointer; transition:all 0.15s; letter-spacing:0.04em; }
+.view-btn:hover { color:var(--accent); border-color:rgba(0,229,160,0.3); }
+.view-btn.active-view { background:var(--accent-dim); color:var(--accent); border-color:rgba(0,229,160,0.35); }
+
+/* ── Table view ── */
+.tbl-th { font-family:var(--mono); font-size:9px; letter-spacing:0.09em; text-transform:uppercase; color:var(--text3); padding:6px 10px; text-align:left; border-bottom:1px solid var(--border2); background:var(--bg2); position:sticky; top:0; z-index:10; white-space:nowrap; }
+.tbl-th.num { text-align:right; }
+.tbl-td { padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:middle; font-size:12px; color:var(--text2); }
+.tbl-td.dim { font-family:var(--mono); font-size:10px; color:var(--text3); white-space:nowrap; }
+.tbl-td.num { font-family:var(--mono); font-size:12px; font-weight:500; text-align:right; white-space:nowrap; }
+.tbl-td.clickable-val { cursor:pointer; color:var(--accent); text-decoration:underline; text-underline-offset:3px; text-decoration-style:dotted; }
+.tbl-td.clickable-val:hover { opacity:0.75; }
+.tbl-td.na-val { color:var(--bg4); text-align:right; font-family:var(--mono); font-size:11px; }
+tr.data-row:hover td { background:rgba(255,255,255,0.02); }
+.expand-row td { padding:0; border-bottom:2px solid var(--border2); }
+.expand-inner { padding:14px 16px; background:var(--bg3); }
+.chart-panels-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:10px; }
+.chart-panel { background:var(--bg2); border:1px solid var(--border); border-radius:8px; padding:12px; }
+.chart-panel-title { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; color:var(--text3); text-transform:uppercase; margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.chart-panel-val { font-size:13px; font-weight:500; font-family:var(--mono); }
+.tbl-exch { font-family:var(--mono); font-size:9px; letter-spacing:0.06em; padding:2px 5px; border-radius:3px; background:var(--bg4); color:var(--text3); border:1px solid var(--border); margin-right:3px; }
+.tbl-spinner { display:inline-block; width:10px; height:10px; border:1.5px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+
+/* ── Calendar: simplified cells (no buttons by default) ── */
+.cell-summary { cursor:pointer; flex:1; }
+.cell-summary:hover .cell-title { color:var(--accent); }
+.cell-panel { display:none; border-top:1px solid var(--border); margin-top:6px; padding-top:6px; }
+.cell-panel.open { display:block; }
+
 /* ── Panels (inherited from shared CSS, need standalone card) ── */
 .market-card { background:var(--bg3); border:1px solid var(--border); border-radius:8px; padding:11px 13px; transition:border-color 0.15s; }
 .market-card:hover { border-color:var(--border2); }
@@ -463,6 +493,11 @@
   <!-- Results bar -->
   <div id="results-bar">
     <div id="results-count" style="color:var(--text3);">Select filters and click Apply</div>
+    <div id="view-toggle" style="display:none; margin-left:auto; display:flex; gap:6px; align-items:center;">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--text3);letter-spacing:0.06em;">VIEW</span>
+      <button id="btn-calendar" class="view-btn active-view" onclick="setView('calendar')">📅 Calendar</button>
+      <button id="btn-table"    class="view-btn"             onclick="setView('table')">📋 Table</button>
+    </div>
   </div>
 
   <!-- Main -->
@@ -473,6 +508,25 @@
       <div class="state-sub">Choose a country and metric to browse economic prediction markets by date.</div>
     </div>
     <div id="content-area" style="display:none;"></div>
+    <div id="table-area" style="display:none; padding:0 0 40px;">
+      <table id="econ-table" style="width:100%;border-collapse:collapse;">
+        <thead>
+          <tr>
+            <th class="tbl-th">Country</th>
+            <th class="tbl-th">Metric</th>
+            <th class="tbl-th">Flavor</th>
+            <th class="tbl-th">Period</th>
+            <th class="tbl-th">Event Title</th>
+            <th class="tbl-th">Exchanges</th>
+            <th class="tbl-th num">Kalshi Forecast</th>
+            <th class="tbl-th num">OMD (Kalshi)</th>
+            <th class="tbl-th num">OMD (Polymarket)</th>
+            <th class="tbl-th num">OMD (ForecastEx)</th>
+          </tr>
+        </thead>
+        <tbody id="econ-tbody"></tbody>
+      </table>
+    </div>
   </div>
 
 </div>
@@ -557,8 +611,12 @@
         document.getElementById('results-count').textContent = '0 markets found';
         return;
       }
+      tableAllData = allData;
       renderGrid(allData);
       loadForecasts(allData);
+      // Show view toggle and switch to current view
+      document.getElementById('view-toggle').style.display = 'flex';
+      setView(currentView);
     } catch(e) {
       document.getElementById('state-box').innerHTML =
         '<div class="state-icon">⚠️</div><div class="state-title">ERROR</div><div class="state-sub">' + e.message + '</div>';
@@ -647,29 +705,30 @@
 
     if (!eventList.length) return cell;
 
-    // Render each event as a sub-card inside the cell
-    eventList.forEach((event, idx) => {
+    // Render each event as a clickable summary; buttons appear in panel below
+    eventList.forEach((event, ei) => {
       const subCard = document.createElement('div');
-      subCard.style.cssText = idx > 0
+      subCard.style.cssText = ei > 0
         ? 'border-top:1px solid var(--border);padding-top:6px;margin-top:4px;'
         : '';
 
-      // Label: metric + flavor (if multiple events) or subtitle
+      // Clickable summary area
+      const summary = document.createElement('div');
+      summary.className = 'cell-summary';
+
       const titleEl = document.createElement('div');
       titleEl.className = 'cell-title';
       const metricLabel = [event.omd_metric, event.omd_metric_flavor].filter(Boolean).join(' · ');
       titleEl.textContent = metricLabel || event.top_market_subtitle || event.event_title;
-      subCard.appendChild(titleEl);
-
-      // Exchange badge
       if (event.exchange) {
         const exch = document.createElement('span');
         exch.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--text3);letter-spacing:0.06em;margin-left:4px;';
-        exch.textContent = event.exchange.toUpperCase().slice(0, 2);
+        exch.textContent = ' ' + event.exchange.toUpperCase().slice(0, 2);
         titleEl.appendChild(exch);
       }
+      summary.appendChild(titleEl);
 
-      // Value placeholder
+      // Value — clicking toggles the action panel
       const valEl = document.createElement('div');
       valEl.className = 'cell-value na';
       valEl.id = 'cell-val-' + event.event_id.replace(/[^a-z0-9]/gi, '_');
@@ -683,17 +742,21 @@
       if (event.is_forecast_market) {
         valEl.innerHTML = '<span class="cell-loading"></span>';
       }
-      subCard.appendChild(valEl);
+      summary.appendChild(valEl);
+      subCard.appendChild(summary);
 
-      // Action buttons
-      const actions = document.createElement('div');
-      actions.className = 'cell-actions';
+      // Hidden action panel — revealed on click
+      const panelDiv = document.createElement('div');
+      panelDiv.className = 'cell-panel';
 
       const isPolymarket = (event.exchange || '').toLowerCase() === 'polymarket';
       const isKalshi     = (event.exchange || '').toLowerCase() === 'kalshi';
       const marketId     = event.top_market_id;
       const conditionId  = event.top_market_condition_id;
       const tokenId      = event.top_market_token_id;
+
+      const actions = document.createElement('div');
+      actions.className = 'cell-actions';
 
       function addBtn(btnLabel, fn) {
         const b = document.createElement('button');
@@ -713,7 +776,7 @@
         if (isPolymarket && tokenId) {
           addBtn('📖 Book', () => showOrderbookFromCell(cell, event));
         }
-        if (isKalshi && marketId) {
+        if (isKalshi) {
           const ticker = marketId.replace(/^ka_/i, '');
           addBtn('🔄 Trades', () => showKalshiTradesPanelFromCell(cell, event, ticker));
           addBtn('📖 Book',   () => showKalshiOrderbookFromCell(cell, event, ticker));
@@ -729,7 +792,14 @@
           addBtn('📊 OMD', () => showOmdForecastPanelFromCell(cell, event));
         }
       }
-      subCard.appendChild(actions);
+      panelDiv.appendChild(actions);
+      subCard.appendChild(panelDiv);
+
+      // Toggle panel on summary click
+      summary.addEventListener('click', () => {
+        panelDiv.classList.toggle('open');
+      });
+
       cell.appendChild(subCard);
     });
 
@@ -939,6 +1009,242 @@
   }
 
   // ── Init ───────────────────────────────────────────────────────
+
+  // ── View management ────────────────────────────────────────────
+  let currentView = 'calendar';
+  let tableChartInstances = {};
+  let tableExpandedRows = new Set();
+  let tableAllData = [];
+
+  const MONTH_NAMES_FULL = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  function setView(view) {
+    currentView = view;
+    document.getElementById('btn-calendar').classList.toggle('active-view', view === 'calendar');
+    document.getElementById('btn-table').classList.toggle('active-view', view === 'table');
+    const calArea = document.getElementById('content-area');
+    const tblArea = document.getElementById('table-area');
+    if (view === 'calendar') {
+      calArea.style.display = 'block';
+      tblArea.style.display = 'none';
+    } else {
+      calArea.style.display = 'none';
+      tblArea.style.display = 'block';
+      renderTable(tableAllData);
+    }
+  }
+
+  // ── Table rendering ────────────────────────────────────────────
+  function renderTable(data) {
+    const tbody = document.getElementById('econ-tbody');
+    tbody.innerHTML = '';
+    tableExpandedRows = new Set();
+
+    // Group same way as calendar: unique event_id rows, sorted by year desc, month asc
+    const sorted = [...data].sort((a, b) => {
+      if ((b.reference_year||0) !== (a.reference_year||0)) return (b.reference_year||0) - (a.reference_year||0);
+      return (a.reference_month||0) - (b.reference_month||0);
+    });
+
+    sorted.forEach(evt => {
+      const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
+      const period = evt.reference_month
+        ? MONTH_NAMES_FULL[(evt.reference_month-1)] + ' ' + evt.reference_year
+        : (evt.reference_year || '—');
+
+      const tr = document.createElement('tr');
+      tr.id = 'trow-' + sk;
+      tr.className = 'data-row';
+      tr.innerHTML =
+        '<td class="tbl-td dim">' + escapeHTML(evt.omd_country || '') + '</td>' +
+        '<td class="tbl-td">' + escapeHTML(evt.omd_metric || '') + '</td>' +
+        '<td class="tbl-td dim">' + escapeHTML(evt.omd_metric_flavor || '') + '</td>' +
+        '<td class="tbl-td dim">' + escapeHTML(String(period)) + '</td>' +
+        '<td class="tbl-td" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(evt.event_title||'') + '">' + escapeHTML(evt.event_title||'') + '</td>' +
+        '<td class="tbl-td">' + exchBadges(evt) + '</td>' +
+        '<td class="tbl-td num na-val" id="tv-kalshi-' + sk + '"><span class="tbl-spinner"></span></td>' +
+        '<td class="tbl-td num na-val" id="tv-omdk-'   + sk + '"><span class="tbl-spinner"></span></td>' +
+        '<td class="tbl-td num na-val" id="tv-omdpm-'  + sk + '"><span class="tbl-spinner"></span></td>' +
+        '<td class="tbl-td num na-val" id="tv-omdfx-'  + sk + '"><span class="tbl-spinner"></span></td>';
+      tbody.appendChild(tr);
+
+      // Expand row for charts
+      const trEx = document.createElement('tr');
+      trEx.id = 'texpand-' + sk;
+      trEx.className = 'expand-row';
+      trEx.style.display = 'none';
+      const tdEx = document.createElement('td');
+      tdEx.colSpan = 10;
+      const inner = document.createElement('div');
+      inner.className = 'expand-inner';
+      inner.id = 'texpand-inner-' + sk;
+      tdEx.appendChild(inner);
+      trEx.appendChild(tdEx);
+      tbody.appendChild(trEx);
+
+      // Load forecasts for this row
+      loadTableRowForecasts(evt, sk);
+    });
+  }
+
+  function exchBadges(evt) {
+    return '<span class="tbl-exch">' + (evt.exchange || 'N/A').toUpperCase().slice(0,2) + '</span>';
+  }
+
+  function fmt4(v) { return v != null ? parseFloat(Number(v).toFixed(4)).toString() : null; }
+
+  function setTableCell(id, val, evtForClick, colType, sk) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (val == null) {
+      el.innerHTML = '<span style="color:var(--bg4)">—</span>';
+      el.className = 'tbl-td num na-val';
+    } else {
+      const span = document.createElement('span');
+      span.className = 'clickable-val';
+      span.textContent = fmt4(val);
+      span.style.cssText = 'cursor:pointer;color:var(--accent);text-decoration:underline;text-underline-offset:3px;text-decoration-style:dotted;';
+      span.addEventListener('click', () => toggleTableExpand(sk, evtForClick));
+      el.innerHTML = '';
+      el.appendChild(span);
+      el.className = 'tbl-td num';
+    }
+  }
+
+  async function loadTableRowForecasts(evt, sk) {
+    const isKalshi = (evt.exchange || '').toLowerCase() === 'kalshi';
+    const isPM     = (evt.exchange || '').toLowerCase() === 'polymarket';
+    const isFX     = (evt.exchange || '').toLowerCase() === 'forecastex';
+
+    if (!tableChartInstances[sk]) tableChartInstances[sk] = {};
+    const fc = tableChartInstances[sk];
+
+    // Kalshi published forecast
+    if (isKalshi && evt.is_forecast_market) {
+      try {
+        const rawId = evt.event_id.replace(/^ka_/i, '');
+        const now = Math.floor(Date.now()/1000);
+        const nowH = Math.floor(now/3600)*3600;
+        const res = await fetch(API_BASE + '/get_kalshi_forecast?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + (nowH-90*86400) + '&end_ts=' + nowH + '&period_interval=60');
+        const data = await res.json();
+        const hist = (data.history||[]).filter(p=>p.p!=null);
+        fc.kalshiHist = hist;
+        fc.kalshiVal  = hist.length ? hist[hist.length-1].p : null;
+      } catch(e) { fc.kalshiVal = null; fc.kalshiHist = []; }
+    } else { fc.kalshiVal = null; fc.kalshiHist = []; }
+    setTableCell('tv-kalshi-'+sk, fc.kalshiVal, evt, 'kalshi', sk);
+
+    // OMD Kalshi
+    if (isKalshi) {
+      try {
+        const res = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
+        const data = await res.json();
+        const hist = (data.history||[]).filter(p=>p.p!=null);
+        fc.omdKHist = hist; fc.omdKMethod = data.calc_method;
+        fc.omdKVal  = hist.length ? hist[hist.length-1].p : null;
+      } catch(e) { fc.omdKVal = null; fc.omdKHist = []; }
+    } else { fc.omdKVal = null; fc.omdKHist = []; }
+    setTableCell('tv-omdk-'+sk, fc.omdKVal, evt, 'omdk', sk);
+
+    // OMD Polymarket
+    if (isPM) {
+      try {
+        const res = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
+        const data = await res.json();
+        const hist = (data.history||[]).filter(p=>p.p!=null);
+        fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method;
+        fc.omdPMVal  = hist.length ? hist[hist.length-1].p : null;
+      } catch(e) { fc.omdPMVal = null; fc.omdPMHist = []; }
+    } else { fc.omdPMVal = null; fc.omdPMHist = []; }
+    setTableCell('tv-omdpm-'+sk, fc.omdPMVal, evt, 'omdpm', sk);
+
+    // OMD ForecastEx
+    if (isFX) {
+      try {
+        const res = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
+        const data = await res.json();
+        const hist = (data.history||[]).filter(p=>p.p!=null);
+        fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method;
+        fc.omdFXVal  = hist.length ? hist[hist.length-1].p : null;
+      } catch(e) { fc.omdFXVal = null; fc.omdFXHist = []; }
+    } else { fc.omdFXVal = null; fc.omdFXHist = []; }
+    setTableCell('tv-omdfx-'+sk, fc.omdFXVal, evt, 'omdfx', sk);
+  }
+
+  function toggleTableExpand(sk, evt) {
+    const trEx  = document.getElementById('texpand-' + sk);
+    const inner = document.getElementById('texpand-inner-' + sk);
+    if (!trEx || !inner) return;
+    if (tableExpandedRows.has(sk)) {
+      trEx.style.display = 'none';
+      tableExpandedRows.delete(sk);
+      return;
+    }
+    tableExpandedRows.add(sk);
+    trEx.style.display = '';
+    renderTableCharts(sk, evt);
+  }
+
+  function renderTableCharts(sk, evt) {
+    const inner = document.getElementById('texpand-inner-' + sk);
+    const fc    = tableChartInstances[sk] || {};
+
+    const series = [
+      { label:'Kalshi Published',  hist:fc.kalshiHist, color:'#4da6ff', method:null },
+      { label:'OMD (Kalshi)',      hist:fc.omdKHist,   color:'#00e5a0', method:fc.omdKMethod },
+      { label:'OMD (Polymarket)',  hist:fc.omdPMHist,  color:'#f0a500', method:fc.omdPMMethod },
+      { label:'OMD (ForecastEx)',  hist:fc.omdFXHist,  color:'#a78bfa', method:fc.omdFXMethod },
+    ].filter(s => s.hist && s.hist.length);
+
+    if (!series.length) {
+      inner.innerHTML = '<div style="padding:10px;font-family:var(--mono);font-size:11px;color:var(--text3);">No forecast history available.</div>';
+      return;
+    }
+
+    inner.innerHTML = '<div class="chart-panels-grid" id="tcpg-' + sk + '"></div>';
+    const grid = document.getElementById('tcpg-' + sk);
+
+    series.forEach(s => {
+      const cid    = 'tcv-' + sk + '-' + s.label.replace(/\W/g,'');
+      const latest = s.hist[s.hist.length-1].p;
+      const div    = document.createElement('div');
+      div.className = 'chart-panel';
+      div.innerHTML =
+        '<div class="chart-panel-title">' +
+        '<span>' + escapeHTML(s.label) + (s.method ? ' <span style="color:var(--text3)">· ' + escapeHTML(s.method) + '</span>' : '') + '</span>' +
+        '<span class="chart-panel-val" style="color:' + s.color + '">' + fmt4(latest) + '</span>' +
+        '</div>' +
+        '<div style="height:130px;"><canvas id="' + cid + '"></canvas></div>';
+      grid.appendChild(div);
+
+      setTimeout(() => {
+        const el = document.getElementById(cid);
+        if (!el || !window.Chart) return;
+        if (chartInstances[cid]) chartInstances[cid].destroy();
+        const labels = s.hist.map(d => {
+          const dt = new Date(d.t * 1000);
+          return (dt.getMonth()+1) + '/' + dt.getDate() + '/' + String(dt.getFullYear()).slice(2);
+        });
+        const values = s.hist.map(d => d.p);
+        const minV = Math.min(...values);
+        const maxV = Math.max(...values);
+        chartInstances[cid] = new Chart(el, {
+          type: 'line',
+          data: { labels, datasets:[{ data:values, borderColor:s.color, borderWidth:1.5, pointRadius:0, fill:true, backgroundColor:s.color+'18', tension:0.3 }] },
+          options: {
+            responsive:true, maintainAspectRatio:false, animation:{duration:200},
+            interaction:{mode:'index',intersect:false},
+            plugins:{ legend:{display:false}, tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5', titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11}, callbacks:{label:i=>' '+fmt4(i.raw)} } },
+            scales:{
+              x:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:10},maxTicksLimit:8,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
+              y:{ min:minV-Math.abs(minV*0.02), max:maxV+Math.abs(maxV*0.02), grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:10},callback:v=>fmt4(v)}, border:{color:'rgba(255,255,255,0.07)'} }
+            }
+          }
+        });
+      }, 50);
+    });
+  }
+
   populateFilters();
 
   // ── Shared panel/chart functions ───────────────────────────────
