@@ -1062,7 +1062,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
         '<td class="tbl-td dim">' + escapeHTML(evt.omd_metric_flavor||'') + '</td>' +
         '<td class="tbl-td dim">' + escapeHTML(String(period)) + '</td>' +
         '<td class="tbl-td" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + escapeHTML(evt.event_title||'') + '">' + escapeHTML(evt.event_title||'') + '</td>' +
-        '<td class="tbl-td"><span class="tbl-exch">' + (evt.exchange||'').toUpperCase().slice(0,2) + '</span></td>' +
+        '<td class="tbl-td"><span class="tbl-exch">' + exchCode(evt.exchange) + '</span></td>' +
         '<td class="tbl-td num" id="tv-kalshi-' + sk + '"><span class="tbl-spinner"></span></td>' +
         '<td class="tbl-td num" id="tv-omdk-'   + sk + '"><span class="tbl-spinner"></span></td>' +
         '<td class="tbl-td num" id="tv-omdpm-'  + sk + '"><span class="tbl-spinner"></span></td>' +
@@ -1089,6 +1089,13 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
   }
 
   function fmt4(v) { return v != null ? parseFloat(Number(v).toFixed(4)).toString() : null; }
+  function exchCode(exch) {
+    const e = (exch||'').toLowerCase();
+    if (e === 'polymarket') return 'PM';
+    if (e === 'forecastex') return 'FX';
+    if (e === 'kalshi')     return 'KA';
+    return (exch||'').toUpperCase().slice(0,2);
+  }
 
   function setTableCell(id, val, sk) {
     const el = document.getElementById(id);
@@ -1175,9 +1182,12 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
     sorted.forEach(evt => {
       const sk = evt.event_id.replace(/[^a-z0-9]/gi, '_');
       const exch = (evt.exchange||'').toLowerCase();
-      if (exch !== 'kalshi')     setTableCell('tv-omdk-'  + sk, null, sk);
-      if (exch !== 'polymarket') setTableCell('tv-omdpm-' + sk, null, sk);
-      if (exch !== 'forecastex') setTableCell('tv-omdfx-' + sk, null, sk);
+      // Kalshi published forecast — clear spinner for non-Kalshi and non-forecast events
+      if (exch !== 'kalshi' || !evt.is_forecast_market)
+                                 setTableCell('tv-kalshi-' + sk, null, sk);
+      if (exch !== 'kalshi')     setTableCell('tv-omdk-'   + sk, null, sk);
+      if (exch !== 'polymarket') setTableCell('tv-omdpm-'  + sk, null, sk);
+      if (exch !== 'forecastex') setTableCell('tv-omdfx-'  + sk, null, sk);
     });
   }
 
