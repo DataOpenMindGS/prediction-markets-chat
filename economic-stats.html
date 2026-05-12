@@ -723,7 +723,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       if (event.exchange) {
         const exch = document.createElement('span');
         exch.style.cssText = 'font-family:var(--mono);font-size:8px;color:var(--text3);letter-spacing:0.06em;margin-left:4px;';
-        exch.textContent = ' ' + event.exchange.toUpperCase().slice(0, 2);
+        exch.textContent = ' ' + exchCode(event.exchange);
         titleEl.appendChild(exch);
       }
       summary.appendChild(titleEl);
@@ -846,14 +846,33 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
               valEl.textContent = parseFloat(latest.toFixed(4)).toString();
               valEl.title       = 'Forecast value (OMD)';
             } else {
-              const p = evt.top_market_last_price;
-              valEl.className   = p != null ? 'cell-value ' + (p > 0.65 ? 'price-high' : p < 0.40 ? 'price-low' : 'price-mid') : 'cell-value na';
-              valEl.textContent = p != null ? Math.round(p * 100) + '%' : '—';
+              // OMD returned no data — show N/A + subtitle + probability
+              const p   = evt.top_market_last_price;
+              const sub = evt.top_market_subtitle || '';
+              valEl.className = 'cell-value na';
+              if (p != null) {
+                const pct = Math.round(p * 100) + '%';
+                valEl.innerHTML =
+                  '<span style="font-family:var(--mono);font-size:9px;color:var(--text3);">Forecast: N/A</span>' +
+                  (sub ? '<div style="font-size:10px;color:var(--text2);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + escapeHTML(sub) + '</div>' : '') +
+                  '<div class="' + (p > 0.65 ? 'price-high' : p < 0.40 ? 'price-low' : 'price-mid') + '" style="font-family:var(--mono);font-size:13px;font-weight:500;">' + pct + '</div>';
+              } else {
+                valEl.innerHTML = '<span style="font-family:var(--mono);font-size:9px;color:var(--text3);">Forecast: N/A</span><div style="font-family:var(--mono);font-size:12px;color:var(--text3);">—</div>';
+              }
             }
           } catch(e2) {
-            const p = evt.top_market_last_price;
-            valEl.className   = p != null ? 'cell-value price-mid' : 'cell-value na';
-            valEl.textContent = p != null ? Math.round(p * 100) + '%' : '—';
+            const p   = evt.top_market_last_price;
+            const sub = evt.top_market_subtitle || '';
+            valEl.className = 'cell-value na';
+            if (p != null) {
+              const pct = Math.round(p * 100) + '%';
+              valEl.innerHTML =
+                '<span style="font-family:var(--mono);font-size:9px;color:var(--text3);">Forecast: N/A</span>' +
+                (sub ? '<div style="font-size:10px;color:var(--text2);margin-top:1px;">' + escapeHTML(sub) + '</div>' : '') +
+                '<div class="' + (p > 0.65 ? 'price-high' : p < 0.40 ? 'price-low' : 'price-mid') + '" style="font-family:var(--mono);font-size:13px;font-weight:500;">' + pct + '</div>';
+            } else {
+              valEl.innerHTML = '<span style="font-family:var(--mono);font-size:9px;color:var(--text3);">Forecast: N/A</span><div style="font-family:var(--mono);font-size:12px;color:var(--text3);">—</div>';
+            }
           }
         }
       } catch(e) {
