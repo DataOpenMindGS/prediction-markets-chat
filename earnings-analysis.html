@@ -703,18 +703,16 @@
     </div>
   </div>
 
-  <!-- SECTION 3: ASYMMETRY -->
+  <!-- SECTION 3: MISS DETECTION -->
   <div class="section">
     <div class="section-header">
       <span class="section-tag">Section 3</span>
-      <h3>The Beat/Miss Asymmetry</h3>
+      <h3>Miss Detection: Signal Strength, Sector &amp; Size Patterns</h3>
     </div>
 
-    <h4>3.1 Structural skew toward beats</h4>
-    <p>The most important structural feature of earnings prediction markets is the skew: companies beat estimates far more often than they miss. Over this dataset, 72.6% of companies beat. This base rate creates a systematic bias — if you are uncertain about an outcome, the rational prior is "probably a Beat." The markets reflect this: the average D-1 beat probability across all events was approximately 70%, slightly below the actual beat rate.</p>
-
-    <h4>3.2 Confusion matrix: Beat detection vs. Miss detection</h4>
-    <p>The performance profile is dramatically different for beats vs. misses. Markets were highly effective at identifying eventual Beats (92.7% recall) but poor at flagging eventual Misses (45.2% recall). In other words, when a company ultimately missed, the market had it wrong — priced above 50% — nearly 55% of the time.</p>
+    <h4>3.1 The beat/miss asymmetry</h4>
+    <p>The most important structural feature of earnings prediction markets is the skew: companies beat estimates far more often than they miss. Over this dataset, 72.6% of companies beat. This base rate creates a systematic bias — if uncertain about an outcome, the rational prior is "probably a Beat." The markets reflect this: the average D-1 beat probability across all events was approximately 70%.</p>
+    <p>The performance profile is dramatically different for beats vs. misses. Markets were highly effective at identifying eventual Beats (92.7% recall) but caught only 45.2% of Misses at D-1 using the 50% threshold. In other words, when a company ultimately missed, the market had it above 50% — predicting a beat — nearly 55% of the time.</p>
 
     <div class="conf-matrix">
       <div class="cell header"></div>
@@ -728,27 +726,247 @@
       <div class="cell tn"><div class="big">112</div><div class="small">True Miss</div></div>
     </div>
 
+    <h4>3.2 The sub-60% signal: precision vs. recall tradeoff</h4>
+    <p>Rather than using the 50% threshold mechanically, a more actionable framing asks: <em>when the market prices a company below 60% to beat, how informative is that?</em> The answer depends on how far below 60% — and which sector the company is in.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Threshold</th>
+            <th>Events Flagged</th>
+            <th>Misses Caught</th>
+            <th>% of All Misses</th>
+            <th>Precision</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:700;color:#fff;">&lt; 20% beat prob</td>
+            <td>52</td>
+            <td>46</td>
+            <td>18.5%</td>
+            <td style="color:var(--green);font-weight:700;">88.5%</td>
+          </tr>
+          <tr>
+            <td>&lt; 40% beat prob</td>
+            <td>130</td>
+            <td>97</td>
+            <td>39.1%</td>
+            <td style="color:var(--accent);">74.6%</td>
+          </tr>
+          <tr>
+            <td>&lt; 50% beat prob</td>
+            <td>160</td>
+            <td>112</td>
+            <td>45.2%</td>
+            <td>70.0%</td>
+          </tr>
+          <tr>
+            <td>&lt; 60% beat prob</td>
+            <td>209</td>
+            <td>133</td>
+            <td>53.6%</td>
+            <td>63.6%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The sub-20% bucket is the cleanest signal: 88.5% precision with only 6 false alarms in 52 flagged events. But it catches fewer than 1-in-5 actual misses. The uncomfortable reality is that <strong>46.4% of all misses were priced above 60% at D-1</strong> — the market simply did not anticipate them. These are genuine surprise misses.</p>
+
+    <p>The price <em>trajectory</em> also matters: for events that ultimately missed, the average D-7 beat probability was 0.60, falling to 0.51 by D-1. About 58% of eventual misses saw their price fall between D-7 and D-1 — a declining trend that itself is a secondary signal, independent of the absolute level.</p>
+
+    <h4>3.3 Miss rates by sector: where the signal is strongest</h4>
+    <p>Miss rates vary dramatically across sectors, and so does the quality of the sub-60% warning signal. The data reveals three distinct tiers:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Sector</th>
+            <th>Miss Rate</th>
+            <th>Sub-60% Precision</th>
+            <th>Sub-60% Recall</th>
+            <th>Surprise Misses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:700;color:#fff;">Real Estate</td>
+            <td style="color:var(--red);">71.4%</td>
+            <td style="color:var(--green);font-weight:700;">90.0%</td>
+            <td style="color:var(--green);font-weight:700;">90.0%</td>
+            <td>10.0%</td>
+          </tr>
+          <tr>
+            <td>Communication Services</td>
+            <td style="color:var(--red);">41.2%</td>
+            <td>71.4%</td>
+            <td>71.4%</td>
+            <td>28.6%</td>
+          </tr>
+          <tr>
+            <td>Healthcare</td>
+            <td>29.4%</td>
+            <td style="color:var(--green);">78.6%</td>
+            <td>73.3%</td>
+            <td>26.7%</td>
+          </tr>
+          <tr>
+            <td>Consumer Discretionary</td>
+            <td style="color:var(--red);">38.8%</td>
+            <td>58.5%</td>
+            <td>47.5%</td>
+            <td>52.5%</td>
+          </tr>
+          <tr>
+            <td>Financials</td>
+            <td>24.7%</td>
+            <td>69.7%</td>
+            <td>52.3%</td>
+            <td>47.7%</td>
+          </tr>
+          <tr>
+            <td>Energy</td>
+            <td>33.3%</td>
+            <td>58.3%</td>
+            <td>70.0%</td>
+            <td>30.0%</td>
+          </tr>
+          <tr>
+            <td>Consumer Staples</td>
+            <td>20.6%</td>
+            <td>42.9%</td>
+            <td>21.4%</td>
+            <td style="color:var(--red);">78.6%</td>
+          </tr>
+          <tr>
+            <td>Industrials</td>
+            <td>21.0%</td>
+            <td>36.4%</td>
+            <td>30.8%</td>
+            <td style="color:var(--red);">69.2%</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;color:#fff;">Technology</td>
+            <td style="color:var(--green);font-weight:700;">9.8%</td>
+            <td>70.0%</td>
+            <td>43.8%</td>
+            <td>56.2%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-12px;">Surprise Misses = % of actual misses that were priced above 60% at D-1 (the market did not anticipate them). Sub-60% Precision = of events priced below 60%, % that actually missed. Sub-60% Recall = % of all misses that were flagged by the sub-60% signal.</p>
+
+    <p>Three patterns stand out:</p>
+    <p><strong>Real Estate: the most reliable miss signal in the dataset.</strong> With a 71.4% base miss rate and 90% sub-60% precision and recall, Real Estate markets appear to price in distress quite accurately — likely because deteriorating fundamentals in property-linked companies tend to be visible in advance. Only 10% of misses came as surprises.</p>
+    <p><strong>Communication Services and Healthcare: strong signal, moderate miss rates.</strong> Both sectors showed sub-60% precision above 70% and recall above 70%, meaning when the market flagged these names as at-risk, it was usually right and it caught most of the misses. These are the sectors where the sub-60% screen is most actionable.</p>
+    <p><strong>Technology: low miss rates but mostly surprise misses.</strong> Technology companies beat at a remarkable 90.2% rate — the highest in the dataset. When they did miss, however, 56% of those misses were priced above 60% at D-1, meaning the market was caught off guard. Tech is a sector where the prediction market is primarily useful as a <em>beat confirmer</em>, not a miss detector.</p>
+    <p><strong>Consumer Staples and Industrials: the market adds least value.</strong> Both sectors had low base miss rates (around 20%) and poor sub-60% signal quality — with recall below 35% and high surprise miss rates (69–79%). These sectors may resist prediction because their earnings surprises stem from idiosyncratic factors (input cost shocks, weather, supply chain) rather than the kind of public information that prediction market participants can synthesize.</p>
+
+    <h4>3.4 Miss rates by market cap: smaller companies are harder to predict</h4>
+    <p>Market capitalization shows a clean, monotonic relationship with both miss rates and the quality of the miss detection signal. Smaller companies miss more often, and when they do miss, the sub-60% signal is sharper.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Market Cap Tier</th>
+            <th>Events</th>
+            <th>Miss Rate</th>
+            <th>Sub-60% Precision</th>
+            <th>Sub-60% Recall</th>
+            <th>Surprise Misses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:700;color:#fff;">Mega (&gt;$200B)</td>
+            <td>78</td>
+            <td style="color:var(--green);font-weight:700;">14.1%</td>
+            <td>66.7%</td>
+            <td>54.5%</td>
+            <td>45.5%</td>
+          </tr>
+          <tr>
+            <td>Large ($10B–$200B)</td>
+            <td>373</td>
+            <td>23.2%</td>
+            <td>55.7%</td>
+            <td>45.3%</td>
+            <td>54.7%</td>
+          </tr>
+          <tr>
+            <td>Mid ($2B–$10B)</td>
+            <td>260</td>
+            <td>26.2%</td>
+            <td>62.5%</td>
+            <td>51.5%</td>
+            <td>48.5%</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;color:#fff;">Small (&lt;$2B)</td>
+            <td>163</td>
+            <td style="color:var(--red);font-weight:700;">45.7%</td>
+            <td style="color:var(--green);font-weight:700;">72.7%</td>
+            <td style="color:var(--green);font-weight:700;">64.9%</td>
+            <td>35.1%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>Small-cap companies missed at nearly <strong>three times the rate</strong> of mega-caps (45.7% vs. 14.1%). More importantly, the sub-60% signal for small-cap names had 72.7% precision and 64.9% recall — the best of any tier — meaning the market was better at <em>anticipating</em> small-cap misses than large-cap ones. This is plausible: small-cap companies tend to have higher earnings volatility and weaker guidance frameworks, making genuine uncertainty more visible in market pricing.</p>
+    <p>Large-cap stocks showed the weakest miss signal precision (55.7%) with the highest surprise miss rate (54.7%). For mega-cap and large-cap names, the market tends to assume a beat until proven otherwise, and misses often arrive as genuine shocks — consistent with the idea that large companies have more sophisticated investor relations and better ability to manage analyst expectations.</p>
+
     <div class="callout-grid">
       <div class="callout">
-        <div class="phase">Beat Recall</div>
-        <div class="big-num" style="color:var(--green);">92.7%</div>
-        <p>Of actual beats, the market correctly predicted 611 of 659</p>
+        <div class="phase">Best Miss Signal</div>
+        <div class="big-num" style="color:var(--green);">Small Cap</div>
+        <p>45.7% miss rate · 72.7% sub-60% precision · 64.9% recall</p>
       </div>
       <div class="callout">
-        <div class="phase">Miss Recall</div>
-        <div class="big-num" style="color:var(--red);">45.2%</div>
-        <p>Of actual misses, the market correctly flagged only 112 of 248</p>
+        <div class="phase">Highest Surprise Rate</div>
+        <div class="big-num" style="color:var(--red);">Large Cap</div>
+        <p>54.7% of large-cap misses were priced above 60% at D-1</p>
       </div>
       <div class="callout">
-        <div class="phase">Beat Precision</div>
-        <div class="big-num" style="color:var(--accent);">81.8%</div>
-        <p>When the market predicted Beat, it was right 611 of 747 times</p>
+        <div class="phase">Most Reliable Sector</div>
+        <div class="big-num" style="color:var(--green);">Real Estate</div>
+        <p>90% sub-60% precision and recall · only 10% surprise misses</p>
       </div>
     </div>
 
-    <h4>3.3 Interpreting the Miss detection gap</h4>
-    <p>The poor miss detection rate (45.2%) should be understood in context. It does not necessarily mean the market was "wrong" — it may reflect genuinely hard-to-predict events. Earnings misses are inherently less predictable: they often result from one-time items, unexpected macro developments, or late-breaking news that wouldn't be priced into a market trading 7–14 days out.</p>
-    <p>More practically: <strong>if the market is pricing a company below 20% to beat (i.e., high confidence in a miss), it was right 85.9% of the time</strong>. The miss detection problem resides almost entirely in events priced in the 20–50% "uncertain" range — where a fully rational market would also be struggling. The signal that matters for investors is the high-conviction tail, not the ambiguous middle.</p>
+    <h4>3.5 Companies that missed repeatedly</h4>
+    <p>Several companies appeared multiple times in the dataset and missed earnings on every event tracked. While sample sizes are small, persistent missers may represent structurally unpredictable businesses or companies in operational distress during this period.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Sector</th>
+            <th>Cap</th>
+            <th>Events</th>
+            <th>Misses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Airbnb</td><td>Consumer Discretionary</td><td>Large</td><td>3</td><td style="color:var(--red);font-weight:700;">3</td></tr>
+          <tr><td>Warby Parker</td><td>Consumer Discretionary</td><td>Small</td><td>3</td><td style="color:var(--red);font-weight:700;">3</td></tr>
+          <tr><td>Rumble</td><td>Communication Services</td><td>Small</td><td>3</td><td style="color:var(--red);font-weight:700;">3</td></tr>
+          <tr><td>Alibaba</td><td>Technology</td><td>Mega</td><td>2</td><td style="color:var(--red);font-weight:700;">2</td></tr>
+          <tr><td>BuzzFeed</td><td>Communication Services</td><td>Small</td><td>2</td><td style="color:var(--red);font-weight:700;">2</td></tr>
+          <tr><td>Opendoor Technologies</td><td>Real Estate</td><td>Small</td><td>3</td><td style="color:var(--red);font-weight:700;">3</td></tr>
+          <tr><td>Capital One</td><td>Financials</td><td>Large</td><td>2</td><td style="color:var(--red);font-weight:700;">2</td></tr>
+          <tr><td>Blackstone</td><td>Financials</td><td>Large</td><td>2</td><td style="color:var(--red);font-weight:700;">2</td></tr>
+          <tr><td>DoorDash</td><td>Consumer Discretionary</td><td>Large</td><td>2</td><td style="color:var(--red);font-weight:700;">2</td></tr>
+          <tr><td>Chipotle Mexican Grill</td><td>Consumer Discretionary</td><td>Large</td><td>2</td><td style="color:var(--red);font-weight:700;">2</td></tr>
+        </tbody>
+      </table>
+    </div>
   </div>
 
   <!-- SECTION 4: VOLUME & MARKET QUALITY -->
