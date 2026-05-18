@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Earnings Beat Accuracy Analysis – Prediction Markets Data</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #111118;
+    --surface2: #16161f;
+    --border: #2a2a3a;
+    --accent: #4f8ef7;
+    --accent2: #7c5cfc;
+    --green: #3ecf8e;
+    --red: #f75f5f;
+    --yellow: #f7c948;
+    --text: #e8e8f0;
+    --muted: #8888a0;
+    --heading-font: 'Georgia', 'Times New Roman', serif;
+    --body-font: 'Georgia', 'Times New Roman', serif;
+    --mono: 'Courier New', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--body-font);
+    font-size: 15px;
+    line-height: 1.75;
+  }
+
+  /* NAV */
+  nav {
+    background: #05050a;
+    border-bottom: 1px solid var(--border);
+    padding: 0 40px;
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 52px;
+    overflow-x: auto;
+  }
+  nav .brand {
+    font-family: var(--mono);
+    font-size: 13px;
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: 0.12em;
+    text-decoration: none;
+    margin-right: 36px;
+    white-space: nowrap;
+  }
+  nav a {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    padding: 0 14px;
+    height: 52px;
+    display: flex;
+    align-items: center;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  nav a:hover { color: var(--text); }
+  nav a.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* BACK LINK */
+  .back-link {
+    max-width: 900px;
+    margin: 28px auto 0;
+    padding: 0 40px;
+  }
+  .back-link a {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    text-decoration: none;
+    letter-spacing: 0.1em;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.15s;
+  }
+  .back-link a:hover { color: var(--accent); }
+
+  /* HERO */
+  .hero {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 52px 40px 40px;
+    border-bottom: 1px solid var(--border);
+  }
+  .hero-tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+  .hero h1 {
+    font-size: 36px;
+    font-weight: 700;
+    line-height: 1.2;
+    color: #fff;
+    margin-bottom: 12px;
+    letter-spacing: -0.01em;
+  }
+  .hero h2 {
+    font-size: 18px;
+    font-weight: 400;
+    color: var(--muted);
+    margin-bottom: 24px;
+    font-style: italic;
+  }
+  .hero-meta {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+  }
+
+  /* STAT CARDS */
+  .stat-cards {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 36px 0 0;
+  }
+  .stat-card {
+    background: var(--surface);
+    padding: 28px 24px;
+  }
+  .stat-card .label {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .stat-card .value {
+    font-size: 34px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .stat-card .value.green { color: var(--green); }
+  .stat-card .value.blue { color: var(--accent); }
+  .stat-card .sub {
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.4;
+  }
+
+  /* MAIN CONTENT */
+  .content {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 40px 80px;
+  }
+
+  /* SECTION */
+  .section {
+    padding: 52px 0 0;
+  }
+  .section-header {
+    display: flex;
+    align-items: baseline;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+    margin-bottom: 28px;
+  }
+  .section-tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .section h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #fff;
+  }
+  .section p {
+    color: #c0c0d0;
+    margin-bottom: 16px;
+    font-size: 14.5px;
+  }
+  .section p:last-child { margin-bottom: 0; }
+  .section h4 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.04em;
+    margin: 28px 0 10px;
+    text-transform: uppercase;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  /* CALLOUT BOXES */
+  .callout-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 28px 0;
+  }
+  .callout {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 20px;
+  }
+  .callout .phase {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+  .callout .big-num {
+    font-size: 26px;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+  }
+  .callout p {
+    font-size: 12.5px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  /* CHART CONTAINER */
+  .chart-wrap {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 28px 24px;
+    margin: 24px 0;
+  }
+  .chart-title {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 20px;
+  }
+  canvas { display: block; width: 100%; }
+
+  /* TABLE */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 24px 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    background: var(--surface2);
+    padding: 12px 16px;
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 16px;
+    border-bottom: 1px solid #1e1e2e;
+    color: var(--text);
+    font-size: 13px;
+  }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--surface2); }
+  .correct { color: var(--green); }
+  .incorrect { color: var(--red); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 2px;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  .badge-beat { background: rgba(62,207,142,0.12); color: var(--green); }
+  .badge-miss { background: rgba(247,95,95,0.12); color: var(--red); }
+  .badge-high { background: rgba(79,142,247,0.12); color: var(--accent); }
+
+  /* DUAL STAT ROW */
+  .dual-stats {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 24px 0;
+  }
+  .dual-stat {
+    background: var(--surface);
+    padding: 24px;
+    text-align: center;
+  }
+  .dual-stat .dval {
+    font-size: 42px;
+    font-weight: 700;
+    color: var(--green);
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+  .dual-stat .dlabel {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .dual-stat .dsub {
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 6px;
+  }
+
+  /* CONFUSION MATRIX */
+  .conf-matrix {
+    display: grid;
+    grid-template-columns: auto 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    margin: 24px 0;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    max-width: 480px;
+  }
+  .conf-matrix .cell {
+    background: var(--surface);
+    padding: 18px 20px;
+    text-align: center;
+  }
+  .conf-matrix .cell.header {
+    background: var(--surface2);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .conf-matrix .cell .big { font-size: 24px; font-weight: 700; }
+  .conf-matrix .cell .small { font-size: 11px; color: var(--muted); margin-top: 4px; }
+  .conf-matrix .cell.tp .big { color: var(--green); }
+  .conf-matrix .cell.tn .big { color: var(--green); }
+  .conf-matrix .cell.fp .big { color: var(--red); }
+  .conf-matrix .cell.fn .big { color: var(--yellow); }
+
+  /* HIGHLIGHT BOX */
+  .highlight {
+    background: linear-gradient(135deg, rgba(79,142,247,0.08), rgba(124,92,252,0.08));
+    border: 1px solid rgba(79,142,247,0.25);
+    border-radius: 4px;
+    padding: 24px;
+    margin: 24px 0;
+  }
+  .highlight strong { color: #fff; }
+  .highlight p { color: #c0c0d8; margin-bottom: 10px; font-size: 14px; }
+  .highlight p:last-child { margin-bottom: 0; }
+
+  /* ACCURACY BAR */
+  .acc-bars { margin: 20px 0; }
+  .acc-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .acc-bar-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    width: 90px;
+    text-align: right;
+    white-space: nowrap;
+  }
+  .acc-bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .acc-bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    transition: width 1s ease;
+  }
+  .acc-bar-val {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--text);
+    width: 44px;
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 32px 40px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  footer p {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 8px;
+  }
+  footer a { color: var(--muted); }
+
+  /* RESPONSIVE */
+  @media (max-width: 700px) {
+    nav { padding: 0 16px; }
+    .hero, .content, .back-link, footer { padding-left: 20px; padding-right: 20px; }
+    .stat-cards { grid-template-columns: 1fr; }
+    .callout-grid { grid-template-columns: 1fr; }
+    .dual-stats { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="brand" href="https://predictionmarketsdata.net/index.html">PREDICTION MARKETS DATA</a>
+  <a href="https://predictionmarketsdata.net/index.html">HOME</a>
+  <a href="https://predictionmarketsdata.net/ai-search.html">AI SEARCH</a>
+  <a href="https://predictionmarketsdata.net/text-search.html">TEXT SEARCH</a>
+  <a href="https://predictionmarketsdata.net/explorer.html">EXPLORER</a>
+  <a href="https://predictionmarketsdata.net/companies.html">COMPANY MARKETS</a>
+  <a href="https://predictionmarketsdata.net/earnings.html">EARNINGS</a>
+  <a href="https://predictionmarketsdata.net/analysis.html" class="active">ANALYSIS</a>
+</nav>
+
+<div class="back-link">
+  <a href="https://predictionmarketsdata.net/analysis.html">← BACK TO ANALYSIS</a>
+</div>
+
+<div class="hero" style="max-width:900px;margin:0 auto;padding:52px 40px 40px;">
+  <div class="hero-tag">EARNINGS BEAT ACCURACY ANALYSIS · MAY 2026</div>
+  <h1>Prediction Markets &amp; Corporate Earnings:<br>An Accuracy Analysis</h1>
+  <h2>Evidence from Earnings Beat / Miss Prediction Markets</h2>
+  <p style="color:#c0c0d0;font-size:14px;margin-bottom:20px;">A data-driven analysis of Polymarket prediction market accuracy across 909 earnings events &middot; Jun 2025 &mdash; May 2026</p>
+
+  <div class="stat-cards">
+    <div class="stat-card">
+      <div class="label">Events Analyzed</div>
+      <div class="value blue">909</div>
+      <div class="sub">Jun 2025 – May 2026</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">High-Confidence Accuracy (D-1)</div>
+      <div class="value green">87.8%</div>
+      <div class="sub">When market priced &gt;80% or &lt;20%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Overall Beat Rate</div>
+      <div class="value">72.6%</div>
+      <div class="sub">660 Beats · 249 Misses</div>
+    </div>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- EXECUTIVE SUMMARY -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Executive Summary</span>
+    </div>
+
+    <div class="highlight">
+      <p><strong>Overview</strong></p>
+      <p>This paper analyzes the accuracy of Polymarket prediction markets in forecasting whether public companies will beat or miss their quarterly earnings estimates. The dataset covers 909 earnings events spanning June 2025 through May 2026, with daily pricing data tracking the market's evolving probability assessment for each event.</p>
+      <p>Unlike the Fed rate decision markets analyzed previously — where markets consistently priced outcomes weeks in advance with high certainty — earnings markets face a structurally different challenge: most earnings seasons compress pricing activity into a narrow 1–2 week window, leaving limited time for probability convergence. Despite this constraint, prediction markets demonstrate meaningful predictive value, particularly for high-conviction signals.</p>
+    </div>
+
+    <h4>Key Findings</h4>
+    <ul style="padding-left:20px;color:#c0c0d0;font-size:14.5px;line-height:2;">
+      <li><strong style="color:#fff;">79.7% overall directional accuracy</strong> at D-1 (the day before earnings) across all 909 events</li>
+      <li>When markets priced a &gt;80% or &lt;20% probability (high-conviction signals), accuracy rose to <strong style="color:#fff;">87.8%</strong></li>
+      <li>63% of events had already reached high-conviction pricing (&gt;80% or &lt;20%) by D-1</li>
+      <li>The naive baseline (always predicting "Beat") yields only <strong style="color:#fff;">72.6%</strong> — markets add meaningful lift beyond this floor</li>
+      <li>Miss detection is significantly harder: markets correctly flagged only <strong style="color:#fff;">45.2%</strong> of eventual misses at D-1, while identifying 92.7% of eventual beats</li>
+      <li>Higher-volume markets showed considerably better accuracy (87.6%) vs. lower-volume markets (71.8%)</li>
+      <li>Total market volume across 909 events: <strong style="color:#fff;">$11.3 million</strong></li>
+    </ul>
+  </div>
+
+  <!-- SECTION 1: BACKGROUND -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 1</span>
+      <h3>Background: Earnings Markets and Their Structure</h3>
+    </div>
+
+    <h4>1.1 What the markets measure</h4>
+    <p>Each Polymarket earnings market poses a simple binary question: "Will [Company] beat quarterly earnings?" Contracts trade between $0 and $1. A price of $0.72 implies a 72% market-assigned probability of an earnings beat. Resolution occurs at the closing price: contracts near $1.00 (≥$0.98) resolve as "Beat," while contracts near $0.00 (≤$0.02) resolve as "Miss."</p>
+
+    <h4>1.2 Structural differences from Fed rate markets</h4>
+    <p>Fed rate decision markets typically have 4–8 weeks of active trading before resolution. Earnings markets are structurally different: most companies report quarterly, and prediction market trading tends to concentrate in the final 7–14 days before the earnings announcement. The median event in this dataset had only 11 days of pricing data, and 25% had 8 or fewer data points.</p>
+    <p>This means the signal-building process documented in the Fed analysis (confidence rising steadily from 30+ days out) is largely absent for earnings. The market dynamic is more abrupt: traders enter a concentrated window, form views, and the market resolves quickly.</p>
+
+    <h4>1.3 Dataset overview</h4>
+    <p>This analysis covers 909 completed earnings beat/miss markets traded on Polymarket from June 2025 through May 2026. The dataset captures a broad cross-section of U.S. publicly traded companies — from mega-cap technology names (NVIDIA, Apple, Alphabet, Meta, Microsoft) to mid-cap industrials, consumer companies, and speculative growth stocks. Total traded dollar volume across all markets was $11.3 million.</p>
+
+    <div class="callout-grid">
+      <div class="callout">
+        <div class="phase">Dataset</div>
+        <div class="big-num">909</div>
+        <p>Unique earnings beat/miss markets from Jun 2025 – May 2026</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Pricing Window</div>
+        <div class="big-num">11 days</div>
+        <p>Median days of pricing data per event; 75th percentile was 14 days</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Total Volume</div>
+        <div class="big-num">$11.3M</div>
+        <p>Total dollar volume traded across all 909 earnings markets</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2: ACCURACY -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 2</span>
+      <h3>Accuracy Analysis</h3>
+    </div>
+
+    <h4>2.1 The base rate problem</h4>
+    <p>Any assessment of prediction market accuracy for earnings must account for the "base rate" effect. Over the Jun 2025 – May 2026 period, <strong>72.6% of companies beat estimates</strong> — a figure consistent with the historical tendency for companies to manage guidance conservatively. A trivial "always predict Beat" model would therefore achieve 72.6% accuracy with zero effort.</p>
+    <p>The meaningful question is whether prediction markets deliver <em>lift</em> over this baseline — and whether they correctly identify the minority of companies that will miss. The answer is nuanced: the markets do add lift, but unevenly.</p>
+
+    <div class="dual-stats">
+      <div class="dual-stat">
+        <div class="dval">72.6%</div>
+        <div class="dlabel">Naive Baseline</div>
+        <div class="dsub">Always predict "Beat"</div>
+      </div>
+      <div class="dual-stat">
+        <div class="dval" style="color:var(--accent);">79.7%</div>
+        <div class="dlabel">D-1 PM Accuracy</div>
+        <div class="dsub">+7.1 percentage points of lift</div>
+      </div>
+    </div>
+
+    <h4>2.2 Accuracy by time horizon</h4>
+    <p>The table below shows directional accuracy and average implied confidence at each time horizon before earnings. Unlike Fed rate markets — where confidence built steadily over 30+ days — earnings markets show relatively flat accuracy from D-7 to D-14, with a meaningful jump at D-1 as final pricing converges.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Horizon</th>
+            <th>Events</th>
+            <th>Directional Accuracy</th>
+            <th>Avg. Confidence</th>
+            <th>High-Conf. Accuracy</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>D-30</td>
+            <td>10</td>
+            <td>60.0%</td>
+            <td>63.1%</td>
+            <td>86.7%</td>
+          </tr>
+          <tr>
+            <td>D-21</td>
+            <td>29</td>
+            <td>86.2%</td>
+            <td>73.4%</td>
+            <td>86.7%</td>
+          </tr>
+          <tr>
+            <td>D-14</td>
+            <td>193</td>
+            <td>76.2%</td>
+            <td>68.7%</td>
+            <td>84.3%</td>
+          </tr>
+          <tr>
+            <td>D-10</td>
+            <td>512</td>
+            <td>74.6%</td>
+            <td>66.9%</td>
+            <td>82.3%</td>
+          </tr>
+          <tr>
+            <td>D-7</td>
+            <td>696</td>
+            <td>75.9%</td>
+            <td>67.0%</td>
+            <td>87.3%</td>
+          </tr>
+          <tr>
+            <td>D-5</td>
+            <td>841</td>
+            <td>77.1%</td>
+            <td>67.9%</td>
+            <td>86.5%</td>
+          </tr>
+          <tr>
+            <td>D-3</td>
+            <td>892</td>
+            <td>76.9%</td>
+            <td>68.0%</td>
+            <td>86.3%</td>
+          </tr>
+          <tr>
+            <td>D-2</td>
+            <td>903</td>
+            <td>78.3%</td>
+            <td>69.0%</td>
+            <td>86.7%</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700;color:#fff;">D-1</td>
+            <td style="font-weight:700;color:#fff;">907</td>
+            <td style="font-weight:700;color:var(--green);">79.7%</td>
+            <td style="font-weight:700;color:#fff;">72.4%</td>
+            <td style="font-weight:700;color:var(--green);">87.8%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-12px;">High-conf. accuracy = accuracy for events priced &gt;80% or &lt;20% at that horizon. D-30/D-21 sample sizes are small due to most markets not opening that early.</p>
+
+    <h4>2.3 The high-confidence signal</h4>
+    <p>The most actionable finding in this data is the divergence between <em>all events</em> and <em>high-confidence events</em>. When the market priced a beat probability above 80% or below 20%, accuracy at D-1 jumped to 87.8%. Roughly 63% of all events fell in this category by D-1 — meaning a majority of markets were giving clean, high-confidence signals.</p>
+
+    <div class="chart-wrap">
+      <div class="chart-title">D-1 Accuracy by Confidence Tier</div>
+      <div class="acc-bars">
+        <div class="acc-bar-row">
+          <div class="acc-bar-label">Very High<br><span style="font-size:9px;">&gt;80% or &lt;20%</span></div>
+          <div class="acc-bar-track"><div class="acc-bar-fill" style="width:87.8%"></div></div>
+          <div class="acc-bar-val">87.8%</div>
+        </div>
+        <div class="acc-bar-row">
+          <div class="acc-bar-label">High<br><span style="font-size:9px;">60–80%</span></div>
+          <div class="acc-bar-track"><div class="acc-bar-fill" style="width:72.9%;background:linear-gradient(90deg,var(--accent),#5fa0ff)"></div></div>
+          <div class="acc-bar-val">72.9%</div>
+        </div>
+        <div class="acc-bar-row">
+          <div class="acc-bar-label">Medium<br><span style="font-size:9px;">40–60%</span></div>
+          <div class="acc-bar-track"><div class="acc-bar-fill" style="width:57.8%;background:linear-gradient(90deg,var(--yellow),#f7a048)"></div></div>
+          <div class="acc-bar-val">57.8%</div>
+        </div>
+        <div class="acc-bar-row">
+          <div class="acc-bar-label">Low<br><span style="font-size:9px;">20–40%</span></div>
+          <div class="acc-bar-track"><div class="acc-bar-fill" style="width:64.0%;background:linear-gradient(90deg,var(--red),#f78858)"></div></div>
+          <div class="acc-bar-val">64.0%</div>
+        </div>
+        <div class="acc-bar-row">
+          <div class="acc-bar-label">Very Low<br><span style="font-size:9px;">0–20%</span></div>
+          <div class="acc-bar-track"><div class="acc-bar-fill" style="width:85.9%;background:linear-gradient(90deg,var(--green),#3ecf6e)"></div></div>
+          <div class="acc-bar-val">85.9%</div>
+        </div>
+      </div>
+      <p style="font-size:11.5px;color:var(--muted);margin-top:8px;">Note: "Very Low" tier = events where the market priced &lt;20% beat probability (i.e., high confidence in a Miss). High accuracy in both tails demonstrates the market identifies confident calls well in both directions.</p>
+    </div>
+  </div>
+
+  <!-- SECTION 3: ASYMMETRY -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 3</span>
+      <h3>The Beat/Miss Asymmetry</h3>
+    </div>
+
+    <h4>3.1 Structural skew toward beats</h4>
+    <p>The most important structural feature of earnings prediction markets is the skew: companies beat estimates far more often than they miss. Over this dataset, 72.6% of companies beat. This base rate creates a systematic bias — if you are uncertain about an outcome, the rational prior is "probably a Beat." The markets reflect this: the average D-1 beat probability across all events was approximately 70%, slightly below the actual beat rate.</p>
+
+    <h4>3.2 Confusion matrix: Beat detection vs. Miss detection</h4>
+    <p>The performance profile is dramatically different for beats vs. misses. Markets were highly effective at identifying eventual Beats (92.7% recall) but poor at flagging eventual Misses (45.2% recall). In other words, when a company ultimately missed, the market had it wrong — priced above 50% — nearly 55% of the time.</p>
+
+    <div class="conf-matrix">
+      <div class="cell header"></div>
+      <div class="cell header">Predicted Beat</div>
+      <div class="cell header">Predicted Miss</div>
+      <div class="cell header" style="text-align:right;padding-right:20px;">Actual Beat</div>
+      <div class="cell tp"><div class="big">611</div><div class="small">True Beat</div></div>
+      <div class="cell fn"><div class="big">48</div><div class="small">Missed Beat</div></div>
+      <div class="cell header" style="text-align:right;padding-right:20px;">Actual Miss</div>
+      <div class="cell fp"><div class="big">136</div><div class="small">False Beat</div></div>
+      <div class="cell tn"><div class="big">112</div><div class="small">True Miss</div></div>
+    </div>
+
+    <div class="callout-grid">
+      <div class="callout">
+        <div class="phase">Beat Recall</div>
+        <div class="big-num" style="color:var(--green);">92.7%</div>
+        <p>Of actual beats, the market correctly predicted 611 of 659</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Miss Recall</div>
+        <div class="big-num" style="color:var(--red);">45.2%</div>
+        <p>Of actual misses, the market correctly flagged only 112 of 248</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Beat Precision</div>
+        <div class="big-num" style="color:var(--accent);">81.8%</div>
+        <p>When the market predicted Beat, it was right 611 of 747 times</p>
+      </div>
+    </div>
+
+    <h4>3.3 Interpreting the Miss detection gap</h4>
+    <p>The poor miss detection rate (45.2%) should be understood in context. It does not necessarily mean the market was "wrong" — it may reflect genuinely hard-to-predict events. Earnings misses are inherently less predictable: they often result from one-time items, unexpected macro developments, or late-breaking news that wouldn't be priced into a market trading 7–14 days out.</p>
+    <p>More practically: <strong>if the market is pricing a company below 20% to beat (i.e., high confidence in a miss), it was right 85.9% of the time</strong>. The miss detection problem resides almost entirely in events priced in the 20–50% "uncertain" range — where a fully rational market would also be struggling. The signal that matters for investors is the high-conviction tail, not the ambiguous middle.</p>
+  </div>
+
+  <!-- SECTION 4: VOLUME & MARKET QUALITY -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 4</span>
+      <h3>Volume, Market Quality, and Notable Events</h3>
+    </div>
+
+    <h4>4.1 Volume as a quality signal</h4>
+    <p>Dollar volume varies enormously across the 909 markets — from under $100 for the thinnest names to over $650,000 for the most-watched events (NVIDIA). This variation is itself informative: high-volume markets attract more sophisticated participants and are likely to be better calibrated.</p>
+    <p>Splitting the dataset at the median volume, higher-volume markets achieved <strong>87.6% D-1 accuracy</strong> vs. only <strong>71.8%</strong> for lower-volume markets — a 15.8 percentage point gap. This strongly suggests that volume is a useful proxy for signal quality: thinner markets should be weighted less in any investment framework.</p>
+
+    <div class="callout-grid">
+      <div class="callout">
+        <div class="phase">High Volume D-1 Accuracy</div>
+        <div class="big-num" style="color:var(--green);">87.6%</div>
+        <p>Events above median dollar volume (N=453)</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Low Volume D-1 Accuracy</div>
+        <div class="big-num" style="color:var(--yellow);">71.8%</div>
+        <p>Events below median dollar volume (N=454)</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Volume Gap</div>
+        <div class="big-num" style="color:var(--accent);">+15.8pp</div>
+        <p>Higher-volume markets are meaningfully more accurate</p>
+      </div>
+    </div>
+
+    <h4>4.2 Highest-volume markets</h4>
+    <p>The table below shows the 15 most actively traded earnings markets in the dataset. These are the events where prediction market data is likely most reliable. NVIDIA's earnings events alone accounted for nearly $900,000 in combined volume.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Outcome</th>
+            <th>Total Volume</th>
+            <th>Final Price</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>NVIDIA</td><td><span class="badge badge-beat">BEAT</span></td><td>$651,846</td><td>0.999</td></tr>
+          <tr><td>Tesla</td><td><span class="badge badge-miss">MISS</span></td><td>$335,312</td><td>0.001</td></tr>
+          <tr><td>Rocket Lab</td><td><span class="badge badge-beat">BEAT</span></td><td>$276,354</td><td>0.999</td></tr>
+          <tr><td>Papa John's International</td><td><span class="badge badge-beat">BEAT</span></td><td>$252,402</td><td>0.999</td></tr>
+          <tr><td>NVIDIA</td><td><span class="badge badge-beat">BEAT</span></td><td>$232,237</td><td>0.999</td></tr>
+          <tr><td>Hilton Grand Vacations</td><td><span class="badge badge-miss">MISS</span></td><td>$225,884</td><td>0.001</td></tr>
+          <tr><td>Domino's Pizza</td><td><span class="badge badge-miss">MISS</span></td><td>$202,765</td><td>0.001</td></tr>
+          <tr><td>Amer Sports</td><td><span class="badge badge-beat">BEAT</span></td><td>$199,888</td><td>0.999</td></tr>
+          <tr><td>Hims &amp; Hers Health</td><td><span class="badge badge-beat">BEAT</span></td><td>$196,605</td><td>0.999</td></tr>
+          <tr><td>Costco Wholesale</td><td><span class="badge badge-miss">MISS</span></td><td>$164,438</td><td>0.004</td></tr>
+          <tr><td>Alphabet</td><td><span class="badge badge-beat">BEAT</span></td><td>$132,856</td><td>0.999</td></tr>
+          <tr><td>Cintas</td><td><span class="badge badge-miss">MISS</span></td><td>$99,607</td><td>0.001</td></tr>
+          <tr><td>Robinhood Markets</td><td><span class="badge badge-beat">BEAT</span></td><td>$96,729</td><td>0.999</td></tr>
+          <tr><td>Alphabet</td><td><span class="badge badge-beat">BEAT</span></td><td>$95,325</td><td>0.999</td></tr>
+          <tr><td>Meta Platforms</td><td><span class="badge badge-beat">BEAT</span></td><td>$80,776</td><td>0.999</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h4>4.3 Notable prediction errors</h4>
+    <p>The most notable high-volume mispredictions at D-1 reveal a pattern: they cluster around events with genuine uncertainty — where both beats and misses were plausible given the public information at the time. The market was not blindly wrong; in many cases it was expressing real uncertainty that happened to resolve the other way.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Actual Outcome</th>
+            <th>D-1 Price</th>
+            <th>Volume</th>
+            <th>Error Type</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Tesla</td>
+            <td><span class="badge badge-miss">MISS</span></td>
+            <td>0.830</td>
+            <td>$335,312</td>
+            <td><span style="color:var(--red);font-size:12px;">Predicted Beat, was Miss</span></td>
+          </tr>
+          <tr>
+            <td>Papa John's</td>
+            <td><span class="badge badge-beat">BEAT</span></td>
+            <td>0.330</td>
+            <td>$252,402</td>
+            <td><span style="color:var(--yellow);font-size:12px;">Predicted Miss, was Beat</span></td>
+          </tr>
+          <tr>
+            <td>Domino's Pizza</td>
+            <td><span class="badge badge-miss">MISS</span></td>
+            <td>0.660</td>
+            <td>$202,765</td>
+            <td><span style="color:var(--red);font-size:12px;">Predicted Beat, was Miss</span></td>
+          </tr>
+          <tr>
+            <td>Tesla</td>
+            <td><span class="badge badge-beat">BEAT</span></td>
+            <td>0.290</td>
+            <td>$67,558</td>
+            <td><span style="color:var(--yellow);font-size:12px;">Predicted Miss, was Beat</span></td>
+          </tr>
+          <tr>
+            <td>Beyond Meat</td>
+            <td><span class="badge badge-miss">MISS</span></td>
+            <td>0.740</td>
+            <td>$67,108</td>
+            <td><span style="color:var(--red);font-size:12px;">Predicted Beat, was Miss</span></td>
+          </tr>
+          <tr>
+            <td>Amazon</td>
+            <td><span class="badge badge-miss">MISS</span></td>
+            <td>0.954</td>
+            <td>$44,525</td>
+            <td><span style="color:var(--red);font-size:12px;">High-conf Beat, was Miss</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>Tesla appears multiple times in this table — including once with 83% confidence in a Beat that turned into a Miss, and once with 71% confidence in a Miss that turned out to be a Beat. Tesla earnings have long been idiosyncratic and difficult to forecast, and this data confirms the prediction market also struggled with them.</p>
+  </div>
+
+  <!-- SECTION 5: QUARTERLY TRENDS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 5</span>
+      <h3>Quarterly Beat Rates and Market Calibration</h3>
+    </div>
+
+    <h4>5.1 Beat rate variation by earnings season</h4>
+    <p>The underlying beat rate varies across reporting periods. The dataset spans three major earnings seasons (Q3 2025, Q4 2025, and Q1 2026), each with a slightly different beat rate. Markets must implicitly calibrate to these seasonal patterns.</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Period</th>
+            <th>Events</th>
+            <th>Beat Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Q3 2025</td><td>9</td><td>88.9%</td></tr>
+          <tr><td>Q4 2025</td><td>370</td><td>75.1%</td></tr>
+          <tr><td>Q1 2026</td><td>295</td><td>68.8%</td></tr>
+          <tr><td>Q2 2026 (partial)</td><td>234</td><td>72.6%</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p>The Q1 2026 reporting season showed a notably lower beat rate (68.8%) compared to Q4 2025 (75.1%), reflecting broader macro uncertainty in early 2026. Prediction markets tracking these events in real time would have needed to implicitly adjust for changing base rates — a sophisticated task that underlines why even modest lift over the naive baseline is meaningful.</p>
+
+    <h4>5.2 Calibration quality</h4>
+    <p>The cleanest test of calibration is this: do events priced at 80%+ actually beat at an ~80%+ rate? In this dataset, events at D-1 split almost entirely into two buckets — &lt;10% (all misses) and &gt;90% (all beats) — with very few intermediate prices at resolution. This binary polarization is expected: markets settle into near-certainty by the time of resolution. The more interesting calibration signal is in the intermediate prices 7–14 days out, where the market is still forming its view.</p>
+  </div>
+
+  <!-- SECTION 6: INVESTMENT APPLICATIONS -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 6</span>
+      <h3>Investment Applications</h3>
+    </div>
+
+    <h4>6.1 Strategies informed by earnings prediction market data</h4>
+
+    <div class="callout-grid" style="grid-template-columns:1fr 1fr;gap:16px;">
+      <div class="callout">
+        <div class="phase">Long/Short Earnings Positioning</div>
+        <p style="color:#c0c0d0;font-size:13px;">High-confidence signals (&gt;80% or &lt;20%) at D-7 were accurate 87%+ of the time. For equity managers running concentrated positions into earnings, this provides an evidence-based framework for sizing and hedging decisions.</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Options Volatility Strategies</div>
+        <p style="color:#c0c0d0;font-size:13px;">Prediction market probabilities can be compared against implied volatility in equity options ahead of earnings. When a high-volume market is pricing a 90%+ beat probability, selling downside protection may be mispriced relative to the PM signal.</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Volume as a Quality Filter</div>
+        <p style="color:#c0c0d0;font-size:13px;">The 15.8pp accuracy gap between high- and low-volume markets is actionable: filter out thin markets and weight the remaining signals by volume. This converts a 79.7% average signal into a consistently higher-quality one.</p>
+      </div>
+      <div class="callout">
+        <div class="phase">Miss Probability Monitoring</div>
+        <p style="color:#c0c0d0;font-size:13px;">While overall miss detection is weak (45.2% recall), when a high-volume market prices a stock below 20% beat probability with high conviction, that is a materially useful warning signal. Track these specific "high-conviction miss" signals.</p>
+      </div>
+    </div>
+
+    <h4>6.2 Comparison to Fed rate market performance</h4>
+    <p>The contrast with Fed rate decision markets is instructive. Fed markets achieved 95.7% directional accuracy on decision day — but that was in a structured, calendar-driven environment with extensive Fed communication, FOMC transcripts, and blackout periods that give markets a clear cadence to work with.</p>
+    <p>Earnings markets operate in a noisier environment: management teams control the information flow, guidance is strategic, and macro surprises can invalidate even well-researched forecasts. An 87.8% accuracy rate for high-confidence earnings signals is therefore arguably as impressive as 95.7% for Fed decisions — the underlying task is harder.</p>
+
+    <h4>6.3 Limitations and caveats</h4>
+    <p>Several important caveats apply to this analysis:</p>
+    <ul style="padding-left:20px;color:#c0c0d0;font-size:14px;line-height:2;">
+      <li><strong style="color:#fff;">Definition of "Beat":</strong> Resolution here uses the final prediction market price, which itself reflects consensus on whether the company beat or missed. This is self-consistent but may not always align with every analyst's definition.</li>
+      <li><strong style="color:#fff;">Limited pricing history:</strong> Most events have only 7–14 days of data. With more lead time, signal quality might improve — or the market might remain uncertain until very close to the announcement.</li>
+      <li><strong style="color:#fff;">Adverse selection:</strong> The fact that a prediction market exists for an event may itself be endogenous — markets are more likely to be created for earnings events perceived as interesting or uncertain.</li>
+      <li><strong style="color:#fff;">Short time series:</strong> This analysis covers approximately one year (Jun 2025 – May 2026). A longer dataset would allow for more robust calibration analysis and seasonal pattern identification.</li>
+    </ul>
+  </div>
+
+  <!-- SECTION 7: CONCLUSION -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-tag">Section 7</span>
+      <h3>Conclusion</h3>
+    </div>
+
+    <div class="highlight">
+      <p>Prediction markets for corporate earnings provide a genuine — if limited — informational edge. Across 909 events, Polymarket earnings markets achieved 79.7% directional accuracy at D-1, representing a 7.1 percentage-point lift over the naive base rate. For high-confidence signals in well-traded markets, accuracy reached 87.8%.</p>
+      <p>The key insight for practitioners is selectivity: <strong>not all signals are equal.</strong> High-volume markets significantly outperform thin ones (87.6% vs. 71.8%). High-conviction signals (priced above 80% or below 20%) dramatically outperform uncertain signals. Filtering to these high-quality signals converts a moderately useful dataset into an actionable investment tool.</p>
+      <p>The structural asymmetry — strong beat detection, weak miss detection — is a fundamental feature of the market, not a bug. Companies miss estimates less than 30% of the time, and when they do, it is often for reasons that were not foreseeable from public information. Sophisticated use of this data means understanding what it can and cannot do: it is a high-precision Beat-detector, a moderate Miss-alerter, and a near-useless tool in the uncertain 20–50% pricing band.</p>
+      <p>For equity investors managing exposure around earnings announcements, this represents a low-cost, high-frequency, real-money-weighted probability signal that adds meaningful information to the earnings event risk management process.</p>
+    </div>
+  </div>
+
+</div><!-- /content -->
+
+<footer>
+  <p>This document is prepared for informational and illustrative purposes only. It does not constitute investment advice, a solicitation, or an offer to buy or sell any financial instrument. Past performance of prediction markets is not indicative of future results. All probability data is sourced from Polymarket exchange pricing. Analysis covers earnings markets from June 2025 through May 2026.</p>
+  <p>Questions? <a href="mailto:Info@OpenMindData.io">Info@OpenMindData.io</a></p>
+  <p>© 2026 Open Mind Data LLC &middot; <a href="https://www.openminddata.io">openminddata.io</a></p>
+</footer>
+
+</body>
+</html>
