@@ -143,6 +143,29 @@
   /* ── Footer ── */
   #page-footer { padding:12px 16px; text-align:center; font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; border-top:1px solid var(--border); }
 
+  /* ── Cross-platform matching panel ── */
+  .match-section-label { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); margin:12px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--border); }
+  .match-section-label:first-child { margin-top:0; }
+  .match-row { display:flex; flex-direction:column; gap:4px; padding:10px 11px; border-radius:7px; background:var(--bg4); border:1px solid var(--border); margin-bottom:6px; transition:border-color 0.15s; }
+  .match-row:hover { border-color:var(--border2); }
+  .match-row-header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .match-platform-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.08em; padding:2px 7px; border-radius:4px; flex-shrink:0; }
+  .match-type-exact   { background:rgba(0,229,160,0.12); color:var(--accent);  border:1px solid rgba(0,229,160,0.25); }
+  .match-type-related { background:rgba(240,165,0,0.12); color:var(--amber);   border:1px solid rgba(240,165,0,0.25); }
+  .match-title { font-size:12px; color:var(--text); line-height:1.45; flex:1; }
+  .match-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:2px; }
+  .match-side { font-family:var(--mono); font-size:10px; }
+  .match-side.yes { color:var(--accent); }
+  .match-side.no  { color:var(--red); }
+  .match-sim-wrap { display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0; }
+  .match-sim-bar-bg { width:60px; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden; }
+  .match-sim-bar-fill { height:100%; border-radius:2px; }
+  .match-sim-score { font-family:var(--mono); font-size:10px; color:var(--text3); white-space:nowrap; }
+  .match-explanation { font-size:11px; color:var(--text3); line-height:1.55; margin-top:4px; padding-top:6px; border-top:1px solid var(--border); font-style:italic; }
+  .match-summary-stats { display:flex; gap:14px; padding:8px 0 6px; flex-wrap:wrap; border-bottom:1px solid var(--border); margin-bottom:4px; }
+  .match-ticker { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .match-no-results { font-family:var(--mono); font-size:11px; color:var(--text3); padding:20px 0; text-align:center; letter-spacing:0.04em; }
+
   /* ── Site Nav ── */
   #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
   .site-nav-left { display:flex; align-items:center; gap:10px; }
@@ -282,6 +305,8 @@
   const KALSHI_ORDERBOOK = `${API_BASE}/get_kalshi_orderbook`;
   const MKT_OI    = `${API_BASE}/get_market_openinterest`;
   const GET_MARKETS = `${API_BASE}/get_markets`;
+  const PREDEXON_BASE  = 'https://api.predexon.com/v2';
+  const PREDEXON_MATCH = `${PREDEXON_BASE}/matching-markets`;
 
   let allMarkets   = [];
   let categoryMap  = [];
@@ -525,6 +550,14 @@
        const rawEventId = m.event_id.replace(/^pm_|^ka_/i, '');
        const exchName = m.exchange || '';
        actions.innerHTML += '<button class="action-btn" onclick="showForecastPanel(\'' + marketId + '\',\'' + exchName + '\',\'' + rawEventId + '\',this)">📈 Forecast</button>';
+     }
+     // Cross-platform match button — Polymarket (condition_id) or Kalshi (ticker)
+     if ((isPolymarket && conditionId) || (isKalshi && marketId)) {
+       const rawTicker = marketId.replace(/^ka_/i, '');
+       const matchParam = isPolymarket
+         ? 'polymarket_condition_id=' + encodeURIComponent(conditionId)
+         : 'kalshi_market_ticker=' + encodeURIComponent(rawTicker);
+       actions.innerHTML += '<button class="action-btn" style="color:var(--blue);border-color:rgba(77,166,255,0.2);" onclick="showMatchingPanel(\'' + marketId + '\',\'' + matchParam + '\',this)">&#9783; Cross-Platform</button>';
      }
      card.appendChild(actions);
     }
@@ -1051,6 +1084,133 @@ async function showMarketsPanel(marketId, eventId, btn) {
     }
   });
 } 
+
+  // ── ⇄ CROSS-PLATFORM MATCHING PANEL ───────────────
+  async function showMatchingPanel(marketId, matchParam, btn) {
+    const card     = btn.closest('.market-card');
+    const title    = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
+    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
+    const pid      = panelId(marketId, 'matching');
+
+    togglePanel(card, pid, async (panel) => {
+      panelShell(panel, title, 'Cross-platform equivalent markets', 'LOADING', 'var(--blue)', subtitle);
+
+      try {
+        const url = `${PREDEXON_MATCH}?${matchParam}&match_type=all`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Matching API ${res.status}`);
+        const data = await res.json();
+
+        const bodyEl = document.getElementById(`${pid}-body`);
+        if (!bodyEl) return;
+
+        // Collect all matches across all platforms
+        const matchesObj  = data.matches || {};
+        const allExact    = [];
+        const allRelated  = [];
+
+        Object.entries(matchesObj).forEach(([platform, bucket]) => {
+          (bucket.exact   || []).forEach(m => allExact.push({...m,   _platform: platform}));
+          (bucket.related || []).forEach(m => allRelated.push({...m, _platform: platform}));
+        });
+
+        const total = allExact.length + allRelated.length;
+
+        // Update badge
+        if (total === 0) {
+          safeBadge(`${pid}-badge`, 'NO MATCHES', 'var(--text3)', 'var(--bg4)', '1px solid var(--border2)');
+        } else {
+          safeBadge(`${pid}-badge`, `${total} MATCH${total !== 1 ? 'ES' : ''}`, 'var(--blue)', 'var(--blue-dim)', '1px solid rgba(77,166,255,0.25)');
+        }
+
+        if (total === 0) {
+          bodyEl.innerHTML = '<div class="match-no-results">No equivalent markets found on other platforms.</div>';
+          return;
+        }
+
+        // Summary stats row
+        const summaryHTML = `
+          <div class="match-summary-stats">
+            <div class="stat"><div class="stat-label">Exact matches</div><div class="stat-value" style="color:var(--accent);font-size:13px;">${allExact.length}</div></div>
+            <div class="stat"><div class="stat-label">Related matches</div><div class="stat-value" style="color:var(--amber);font-size:13px;">${allRelated.length}</div></div>
+            <div class="stat"><div class="stat-label">Platforms</div><div class="stat-value" style="font-size:12px;">${Object.keys(matchesObj).join(', ')}</div></div>
+          </div>`;
+
+        // Render a single match row
+        function renderMatchRow(m, type) {
+          const platform    = (m._platform || '').toUpperCase();
+          const typeClass   = type === 'exact' ? 'match-type-exact' : 'match-type-related';
+          const typeLabel   = type === 'exact' ? 'EXACT' : 'RELATED';
+          const titleText   = escapeHTML(m.title || m.market_ticker || '—');
+          const ticker      = m.market_ticker ? `<span class="match-ticker">${escapeHTML(m.market_ticker)}</span>` : '';
+          const slug        = m.market_slug   ? `<span class="match-ticker">${escapeHTML(m.market_slug)}</span>` : '';
+          const idLabel     = ticker || slug;
+
+          // Side alignment
+          let sideHTML = '';
+          if (m.side) {
+            const sideUp  = m.side.toUpperCase();
+            const sClass  = sideUp === 'YES' ? 'yes' : 'no';
+            sideHTML = `<span class="match-side ${sClass}">↔ ${sideUp} side</span>`;
+          }
+
+          // Status badge
+          const statusHTML = m.status
+            ? `<span style="font-family:var(--mono);font-size:9px;color:${m.status === 'active' ? 'var(--accent2)' : 'var(--text3)'};">${m.status.toUpperCase()}</span>`
+            : '';
+
+          // Similarity bar
+          let simHTML = '';
+          if (m.similarity != null) {
+            const pct   = Math.min(100, Math.max(0, m.similarity));
+            const color = pct >= 98 ? 'var(--accent)' : pct >= 96 ? 'var(--accent2)' : 'var(--amber)';
+            simHTML = `
+              <div class="match-sim-wrap">
+                <div class="match-sim-bar-bg"><div class="match-sim-bar-fill" style="width:${pct}%;background:${color};"></div></div>
+                <span class="match-sim-score">${pct}</span>
+              </div>`;
+          }
+
+          // Explanation (collapsible via title attr tooltip on hover, full text below)
+          const explHTML = m.explanation
+            ? `<div class="match-explanation">${escapeHTML(m.explanation)}</div>`
+            : '';
+
+          return `
+            <div class="match-row">
+              <div class="match-row-header">
+                <span class="match-platform-badge ${typeClass}">${platform} · ${typeLabel}</span>
+                <span class="match-title">${titleText}</span>
+              </div>
+              <div class="match-meta">
+                ${idLabel}
+                ${sideHTML}
+                ${statusHTML}
+                ${simHTML}
+              </div>
+              ${explHTML}
+            </div>`;
+        }
+
+        let html = summaryHTML;
+
+        if (allExact.length) {
+          html += `<div class="match-section-label">Exact matches &mdash; similarity &ge; 95</div>`;
+          html += allExact.map(m => renderMatchRow(m, 'exact')).join('');
+        }
+        if (allRelated.length) {
+          html += `<div class="match-section-label">Related matches &mdash; similarity 80&ndash;94</div>`;
+          html += allRelated.map(m => renderMatchRow(m, 'related')).join('');
+        }
+
+        bodyEl.innerHTML = html;
+
+      } catch(e) {
+        safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load matching data.</div>');
+        console.error('Matching panel error:', e);
+      }
+    });
+  }
 
   // ── Init ────────────────────────────────────────────
   async function init() {
