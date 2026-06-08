@@ -6,6 +6,7 @@
 <title>Prediction Markets — Market Cap Leaderboard</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flag-icons@7.2.3/css/flag-icons.min.css">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -382,9 +383,9 @@
     return '$' + Math.round(v);
   }
   function fmtK(v) {
-    // Format as thousands with comma, no symbol — for the $K columns
+    // Format as thousands integer with comma separator, no symbol — for the $K columns
     if (v == null || v === 0) return '—';
-    return (v / 1000).toLocaleString(undefined, {minimumFractionDigits:0, maximumFractionDigits:1});
+    return Math.round(v / 1000).toLocaleString();
   }
   function fmtChgDollar(v) {
     if (v == null) return '—';
@@ -411,6 +412,35 @@
   function fmtDate(ts) { const d=new Date(ts*1000); return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; }
   function fmtTime(ts) { const d=new Date(ts*1000); return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2,'0')}`; }
   function escapeHTML(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  // ISO 3166-1 alpha-3 → alpha-2 for flag emoji generation
+  const ISO3_TO_2 = {
+    AFG:'AF',ALB:'AL',DZA:'DZ',AND:'AD',AGO:'AO',ARG:'AR',ARM:'AM',AUS:'AU',AUT:'AT',AZE:'AZ',
+    BHS:'BS',BHR:'BH',BGD:'BD',BLR:'BY',BEL:'BE',BLZ:'BZ',BEN:'BJ',BTN:'BT',BOL:'BO',BIH:'BA',
+    BWA:'BW',BRA:'BR',BRN:'BN',BGR:'BG',BFA:'BF',BDI:'BI',CPV:'CV',KHM:'KH',CMR:'CM',CAN:'CA',
+    CAF:'CF',TCD:'TD',CHL:'CL',CHN:'CN',COL:'CO',COM:'KM',COD:'CD',COG:'CG',CRI:'CR',HRV:'HR',
+    CUB:'CU',CYP:'CY',CZE:'CZ',DNK:'DK',DJI:'DJ',DOM:'DO',ECU:'EC',EGY:'EG',SLV:'SV',GNQ:'GQ',
+    ERI:'ER',EST:'EE',SWZ:'SZ',ETH:'ET',FJI:'FJ',FIN:'FI',FRA:'FR',GAB:'GA',GMB:'GM',GEO:'GE',
+    DEU:'DE',GHA:'GH',GRC:'GR',GTM:'GT',GIN:'GN',GNB:'GW',GUY:'GY',HTI:'HT',HND:'HN',HUN:'HU',
+    ISL:'IS',IND:'IN',IDN:'ID',IRN:'IR',IRQ:'IQ',IRL:'IE',ISR:'IL',ITA:'IT',JAM:'JM',JPN:'JP',
+    JOR:'JO',KAZ:'KZ',KEN:'KE',KWT:'KW',KGZ:'KG',LAO:'LA',LVA:'LV',LBN:'LB',LSO:'LS',LBR:'LR',
+    LBY:'LY',LIE:'LI',LTU:'LT',LUX:'LU',MDG:'MG',MWI:'MW',MYS:'MY',MDV:'MV',MLI:'ML',MLT:'MT',
+    MRT:'MR',MUS:'MU',MEX:'MX',MDA:'MD',MCO:'MC',MNG:'MN',MNE:'ME',MAR:'MA',MOZ:'MZ',MMR:'MM',
+    NAM:'NA',NPL:'NP',NLD:'NL',NZL:'NZ',NIC:'NI',NER:'NE',NGA:'NG',MKD:'MK',NOR:'NO',OMN:'OM',
+    PAK:'PK',PAN:'PA',PNG:'PG',PRY:'PY',PER:'PE',PHL:'PH',POL:'PL',PRT:'PT',QAT:'QA',ROU:'RO',
+    RUS:'RU',RWA:'RW',SAU:'SA',SEN:'SN',SRB:'RS',SLE:'SL',SGP:'SG',SVK:'SK',SVN:'SI',SOM:'SO',
+    ZAF:'ZA',SSD:'SS',ESP:'ES',LKA:'LK',SDN:'SD',SUR:'SR',SWE:'SE',CHE:'CH',SYR:'SY',TWN:'TW',
+    TJK:'TJ',TZA:'TZ',THA:'TH',TLS:'TL',TGO:'TG',TTO:'TT',TUN:'TN',TUR:'TR',TKM:'TM',UGA:'UG',
+    UKR:'UA',ARE:'AE',GBR:'GB',USA:'US',URY:'UY',UZB:'UZ',VEN:'VE',VNM:'VN',YEM:'YE',ZMB:'ZM',
+    ZWE:'ZW',EUR:'EU',INT:'UN',GLB:'UN'
+  };
+
+  function fmtCountry(code) {
+    if (!code) return '—';
+    const alpha2 = (ISO3_TO_2[code] || '').toLowerCase();
+    const flag = alpha2 ? `<span class="fi fi-${alpha2}" style="margin-right:5px;border-radius:2px;flex-shrink:0;"></span>` : '';
+    return flag + escapeHTML(code);
+  }
+
   function safeHTML(id, html) { const el=document.getElementById(id); if(el) el.innerHTML=html; }
   function safeBadge(id, text, color, bg, border) { const el=document.getElementById(id); if(!el) return; el.textContent=text; el.style.color=color; el.style.background=bg; el.style.border=border; }
 
@@ -570,7 +600,7 @@
         <td class="r"><span class="${chgPCls}">${chgP}</span></td>
         <td class="r"><span class="vol-val">${volK}</span></td>
         <td><span class="tag-sm">${escapeHTML(m.category||'—')}</span></td>
-        <td><span class="tag-sm">${escapeHTML(m.country||'—')}</span></td>
+        <td><span class="tag-sm" style="display:inline-flex;align-items:center;">${fmtCountry(m.country)}</span></td>
         <td class="top-market-cell">${escapeHTML(subtitle)}</td>
         <td class="r"><span class="${pClass}">${pct}</span></td>`;
 
@@ -607,8 +637,21 @@
     const subtitle     = m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? m.top_market_subtitle : null;
 
     document.getElementById('modal-title').textContent = m.event_title || '—';
-    document.getElementById('modal-subtitle').textContent =
-      [m.exchange, m.category, m.country].filter(Boolean).join(' · ');
+    const subtitleParts = [m.exchange, m.category].filter(Boolean).join(' · ');
+    const subtitleEl = document.getElementById('modal-subtitle');
+    subtitleEl.innerHTML = '';
+    if (subtitleParts) {
+      subtitleEl.appendChild(document.createTextNode(subtitleParts));
+    }
+    if (m.country) {
+      if (subtitleParts) subtitleEl.appendChild(document.createTextNode(' · '));
+      const countrySpan = document.createElement('span');
+      countrySpan.style.display = 'inline-flex';
+      countrySpan.style.alignItems = 'center';
+      countrySpan.style.gap = '3px';
+      countrySpan.innerHTML = fmtCountry(m.country);
+      subtitleEl.appendChild(countrySpan);
+    }
 
     // Stats row
     const chg1dD   = m.oi_change_1d   != null ? fmtChgDollar(m.oi_change_1d)    : '—';
