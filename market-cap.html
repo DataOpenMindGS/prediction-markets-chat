@@ -188,28 +188,6 @@
   .trades-table .yes  { color:var(--accent); }
   .trades-table .no   { color:var(--red); }
 
-  /* ── Cross-platform matching ── */
-  .match-section-label { font-family:var(--mono); font-size:9px; letter-spacing:0.1em; text-transform:uppercase; color:var(--text3); margin:12px 0 6px; padding-bottom:4px; border-bottom:1px solid var(--border); }
-  .match-section-label:first-child { margin-top:0; }
-  .match-row { display:flex; flex-direction:column; gap:4px; padding:10px 11px; border-radius:7px; background:var(--bg4); border:1px solid var(--border); margin-bottom:6px; }
-  .match-row:hover { border-color:var(--border2); }
-  .match-row-header { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-  .match-platform-badge { font-family:var(--mono); font-size:9px; letter-spacing:0.08em; padding:2px 7px; border-radius:4px; flex-shrink:0; }
-  .match-type-exact   { background:rgba(0,229,160,0.12); color:var(--accent);  border:1px solid rgba(0,229,160,0.25); }
-  .match-type-related { background:rgba(240,165,0,0.12); color:var(--amber);   border:1px solid rgba(240,165,0,0.25); }
-  .match-title { font-size:12px; color:var(--text); line-height:1.45; flex:1; }
-  .match-meta { display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:2px; }
-  .match-side { font-family:var(--mono); font-size:10px; }
-  .match-side.yes { color:var(--accent); }
-  .match-side.no  { color:var(--red); }
-  .match-sim-wrap { display:flex; align-items:center; gap:6px; margin-left:auto; flex-shrink:0; }
-  .match-sim-bar-bg { width:60px; height:4px; background:var(--bg3); border-radius:2px; overflow:hidden; }
-  .match-sim-bar-fill { height:100%; border-radius:2px; }
-  .match-sim-score { font-family:var(--mono); font-size:10px; color:var(--text3); white-space:nowrap; }
-  .match-explanation { font-size:11px; color:var(--text3); line-height:1.55; margin-top:4px; padding-top:6px; border-top:1px solid var(--border); font-style:italic; }
-  .match-summary-stats { display:flex; gap:14px; padding:8px 0 6px; flex-wrap:wrap; border-bottom:1px solid var(--border); margin-bottom:4px; }
-  .match-ticker { font-family:var(--mono); font-size:10px; color:var(--text3); }
-  .match-no-results { font-family:var(--mono); font-size:11px; color:var(--text3); padding:20px 0; text-align:center; letter-spacing:0.04em; }
 
   /* ── Footer ── */
   #page-footer { padding:12px 16px; text-align:center; font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; border-top:1px solid var(--border); }
@@ -358,16 +336,10 @@
 <script>
   const API_BASE        = 'https://api.dataopenmind.com/public';
   const OMD_PRICES      = `${API_BASE}/get_daily_prices`;
-  const LIVE_PRICE      = `${API_BASE}/get_live_price`;
-  const MKT_VOLUME      = `${API_BASE}/get_market_volume`;
-  const MKT_ORDERBOOK   = `${API_BASE}/get_market_orderbook`;
-  const MKT_TRADES      = `${API_BASE}/get_market_trades`;
   const KALSHI_TRADES   = `${API_BASE}/get_kalshi_trades`;
   const KALSHI_ORDERBOOK= `${API_BASE}/get_kalshi_orderbook`;
-  const MKT_OI          = `${API_BASE}/get_market_openinterest`;
   const EVT_OI          = `${API_BASE}/get_event_openinterest`;
   const GET_MARKETS     = `${API_BASE}/get_markets`;
-  const PREDEXON_MATCH  = `${API_BASE}/get_matching_markets`;
 
   let allEvents     = [];
   let sortCol       = 'open_interest_usd';
@@ -629,11 +601,8 @@
     activeMarket = m;
     chartInstances = {}; // reset charts for new modal context
 
-    const isPolymarket = (m.exchange||'').toLowerCase()==='polymarket';
     const isKalshi     = (m.exchange||'').toLowerCase()==='kalshi';
     const marketId     = m.top_market_id;
-    const tokenId      = m.top_market_token_id;
-    const conditionId  = m.top_market_condition_id;
     const price        = m.top_market_last_price;
     const subtitle     = m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? m.top_market_subtitle : null;
 
@@ -693,8 +662,7 @@
     const actionsEl = document.getElementById('modal-actions');
     actionsEl.innerHTML = '';
     if(marketId) {
-      const dataAttrs = `data-market-id="${marketId}" ${tokenId&&isPolymarket?`data-token-id="${tokenId}"`:''}
-        ${conditionId&&isPolymarket?`data-condition-id="${conditionId}"`:''}
+      const dataAttrs = `data-market-id="${marketId}"
         data-exchange="${m.exchange||''}" data-source="omd"
         ${m.event_id?`data-event-id="${m.event_id}"`:''}`;
 
@@ -703,20 +671,11 @@
       const trigger = document.createElement('span');
       trigger.id = 'modal-price-trigger';
       trigger.setAttribute('data-market-id', marketId);
-      if(tokenId && isPolymarket) trigger.setAttribute('data-token-id', tokenId);
       trigger.setAttribute('data-exchange', m.exchange||'');
       if(m.event_id) trigger.setAttribute('data-event-id', m.event_id);
       trigger.style.display='none';
       actionsEl.appendChild(trigger);
 
-      if(isPolymarket && conditionId) {
-        addModalBtn(actionsEl, '📊 Volume',    `showVolumePanel('${marketId}','${conditionId}',null)`);
-        addModalBtn(actionsEl, '📐 Mkt OI',    `showMarketOIPanel('${marketId}','${conditionId}',null)`);
-        addModalBtn(actionsEl, '🔄 Trades',    `showTradesPanel('${marketId}','${conditionId}',null)`);
-      }
-      if(isPolymarket && tokenId) {
-        addModalBtn(actionsEl, '📖 Order Book',`showOrderbookPanel('${marketId}','${tokenId}',null)`);
-      }
       if(isKalshi && marketId) {
         const ticker = marketId.replace(/^ka_/i,'');
         addModalBtn(actionsEl, '🔄 Trades',    `showKalshiTradesPanel('${marketId}','${ticker}',null)`);
@@ -726,16 +685,9 @@
         addModalBtn(actionsEl, '📐 Event OI',  `showEventOIPanel('${marketId}','${m.event_id}',null)`, 'oi-btn');
         addModalBtn(actionsEl, '☰ Markets',    `showMarketsPanel('${marketId}','${m.event_id}',null)`);
       }
-      if((isPolymarket||isKalshi) && m.event_id && m.is_forecast_market) {
-        const rawId = m.event_id.replace(/^pm_|^ka_/i,'');
+      if(isKalshi && m.event_id && m.is_forecast_market) {
+        const rawId = m.event_id.replace(/^ka_/i,'');
         addModalBtn(actionsEl, '📈 Forecast',  `showForecastPanel('${marketId}','${m.exchange||''}','${rawId}',null)`);
-      }
-      if((isPolymarket&&conditionId)||(isKalshi&&marketId)) {
-        const rawTicker = marketId.replace(/^ka_/i,'');
-        const matchParam = isPolymarket
-          ? 'polymarket_condition_id='+encodeURIComponent(conditionId)
-          : 'kalshi_market_ticker='+encodeURIComponent(rawTicker);
-        addModalBtn(actionsEl, '⇄ Cross-Platform', `showMatchingPanel('${marketId}','${matchParam}',null)`, '', 'var(--blue)');
       }
     }
 
@@ -816,8 +768,6 @@
   async function showPriceChart(el) {
     if(!el) return;
     const marketId = el.dataset.marketId;
-    const tokenId  = el.dataset.tokenId;
-    const exchange = el.dataset.exchange || 'Polymarket';
     const title    = getModalTitle();
     const subtitle = getModalSubtitle();
     const pid      = panelId(marketId, 'price');
@@ -832,9 +782,6 @@
           .map(r=>({date:r.end_period_date, price:parseFloat(r.close_price)}));
         if(!prices.length) { safeHTML(`${pid}-body`,'<div class="panel-loading">No price history available.</div>'); return; }
         let livePrice=null,liveTime=null,hasLive=false;
-        if(exchange==='Polymarket'&&tokenId) {
-          try { const lr=await fetch(`${LIVE_PRICE}?token_id=${encodeURIComponent(tokenId)}`); const ld=await lr.json(); if(ld.price!=null){livePrice=parseFloat(ld.price);liveTime=ld.time||null;hasLive=true;} } catch(e){}
-        }
         const labels=prices.map(p=>{const d=new Date(p.date+'T00:00:00');return`${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;});
         const data=prices.map(p=>Math.round(p.price*1000)/10);
         if(hasLive){const ld=liveTime?new Date(liveTime*1000):new Date();labels.push(`${ld.getMonth()+1}/${ld.getDate()}/${String(ld.getFullYear()).slice(2)} ▲`);data.push(Math.round(livePrice*1000)/10);}
@@ -853,59 +800,6 @@
         else{safeBadge(`${pid}-badge`,'EOD','var(--amber)','var(--amber-dim)','1px solid rgba(240,165,0,0.25)');}
         safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Current</div><div class="stat-value">${currP.toFixed(1)}%</div></div><div class="stat"><div class="stat-label">1D Change</div><div class="stat-value ${ch1d>=0?'up':'down'}">${ch1d>=0?'+':''}${ch1d.toFixed(1)}%</div></div><div class="stat"><div class="stat-label">All-Time Change</div><div class="stat-value ${chAll>=0?'up':'down'}">${chAll>=0?'+':''}${chAll.toFixed(1)}%</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">As of</div><div class="stat-value" style="font-size:11px;">${hasLive?'Live':'Prior Day Close'}</div></div>`);
       } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load price data.</div>');console.error(e);}
-    });
-  }
-
-  // ── 📊 VOLUME CHART ────────────────────────────────────
-  async function showVolumePanel(marketId, conditionId, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'volume');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'90-day trading volume','LOADING','var(--blue)',subtitle);
-      try {
-        const res=await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
-        const json=await res.json();
-        const pts=(json.data||[]).sort((a,b)=>a.timestamp-b.timestamp);
-        if(!pts.length){safeHTML(`${pid}-body`,'<div class="panel-loading">No volume data available.</div>');return;}
-        const labels=pts.map(p=>fmtDate(p.timestamp));
-        const yesVol=pts.map(p=>Math.round((p.yes_volume||0)*100)/100);
-        const noVol=pts.map(p=>Math.round((p.no_volume||0)*100)/100);
-        const totalVol=pts.reduce((s,p)=>s+(p.total_volume||0),0);
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        bodyEl.innerHTML=`<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-        safeBadge(`${pid}-badge`,'90D','var(--blue)','var(--blue-dim)','1px solid rgba(77,166,255,0.25)');
-        if(chartInstances[pid]){chartInstances[pid].destroy();delete chartInstances[pid];}
-        const canvasEl=document.getElementById(`${pid}-canvas`);
-        if(!canvasEl) return;
-        chartInstances[pid]=new Chart(canvasEl,{type:'bar',data:{labels,datasets:[{label:'YES',data:yesVol,backgroundColor:'rgba(0,229,160,0.7)',borderWidth:0,stack:'vol'},{label:'NO',data:noVol,backgroundColor:'rgba(255,77,109,0.7)',borderWidth:0,stack:'vol'}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},plugins:{legend:{display:true,labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:11},callbacks:{label:(i)=>` ${i.dataset.label}: ${fmtVol(i.raw)}`}}},scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)},border:{color:'rgba(255,255,255,0.07)'}}}}});
-        safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">${fmtVol(totalVol)}</div></div><div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">${fmtVol(yesVol.reduce((s,v)=>s+v,0))}</div></div><div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">${fmtVol(noVol.reduce((s,v)=>s+v,0))}</div></div>`);
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load volume data.</div>');console.error(e);}
-    });
-  }
-
-  // ── 📐 MARKET-LEVEL OI ─────────────────────────────────
-  async function showMarketOIPanel(marketId, conditionId, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'mktoi');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'90-day market open interest','LOADING','var(--amber)',subtitle);
-      try {
-        const res=await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
-        const json=await res.json();
-        const pts=(json.open_interest_over_time||[]).sort((a,b)=>a.timestamp-b.timestamp);
-        if(!pts.length){safeHTML(`${pid}-body`,'<div class="panel-loading">No open interest data available.</div>');return;}
-        const labels=pts.map(p=>fmtDate(p.timestamp));
-        const data=pts.map(p=>Math.round((p.open_interest_usd||0)*100)/100);
-        const currOI=data[data.length-1], chOI=currOI-data[0];
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        bodyEl.innerHTML=`<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-        safeBadge(`${pid}-badge`,'90D','var(--amber)','var(--amber-dim)','1px solid rgba(240,165,0,0.25)');
-        if(chartInstances[pid]){chartInstances[pid].destroy();delete chartInstances[pid];}
-        const canvasEl=document.getElementById(`${pid}-canvas`);
-        if(!canvasEl) return;
-        chartInstances[pid]=new Chart(canvasEl,{type:'line',data:{labels,datasets:[{data,borderColor:'#f0a500',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,fill:true,backgroundColor:(ctx)=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,140);g.addColorStop(0,'rgba(240,165,0,0.15)');g.addColorStop(1,'rgba(240,165,0,0)');return g;},tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:12},callbacks:{label:(i)=>` ${fmtVol(i.raw)}`}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)},border:{color:'rgba(255,255,255,0.07)'}}}}});
-        safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div><div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div><div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div><div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load open interest data.</div>');console.error(e);}
     });
   }
 
@@ -935,37 +829,6 @@
         chartInstances[pid]=new Chart(canvasEl,{type:'line',data:{labels,datasets:[{label:'Total OI',data:totalOI,borderColor:'#a78bfa',borderWidth:2,pointRadius:0,pointHoverRadius:4,fill:true,backgroundColor:(ctx)=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,160);g.addColorStop(0,'rgba(167,139,250,0.15)');g.addColorStop(1,'rgba(167,139,250,0)');return g;},tension:0.3},{label:'Yes OI',data:yesOI,borderColor:'#00e5a0',borderWidth:1.2,pointRadius:0,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[4,3]},{label:'No OI',data:noOI,borderColor:'#ff4d6d',borderWidth:1.2,pointRadius:0,pointHoverRadius:3,fill:false,tension:0.3,borderDash:[4,3]}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:400},interaction:{mode:'index',intersect:false},plugins:{legend:{display:true,labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:10},boxWidth:10,padding:10}},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:11},callbacks:{label:(i)=>` ${i.dataset.label}: ${fmtVol(i.raw)}`}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)},border:{color:'rgba(255,255,255,0.07)'}}}}});
         safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Current OI</div><div class="stat-value purple">${fmtVol(currOI)}</div></div><div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div><div class="stat"><div class="stat-label">Yes OI</div><div class="stat-value up">${fmtVol(currYes)}</div></div><div class="stat"><div class="stat-label">No OI</div><div class="stat-value down">${fmtVol(currNo)}</div></div><div class="stat"><div class="stat-label">Yes/No Ratio</div><div class="stat-value">${currNo>0?(currYes/currNo).toFixed(2):'—'}</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...totalOI))}</div></div>`);
       } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load event OI data.</div>');console.error(e);}
-    });
-  }
-
-  // ── 📖 ORDER BOOK (Polymarket) ─────────────────────────
-  async function showOrderbookPanel(marketId, tokenId, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'orderbook');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'Current order book depth','LOADING','var(--amber)',subtitle);
-      try {
-        const res=await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
-        const json=await res.json();
-        const snap=(json.snapshots||[])[0];
-        if(!snap){safeHTML(`${pid}-body`,'<div class="panel-loading">No orderbook data available.</div>');return;}
-        const bids=(snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
-        const asks=(snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
-        safeBadge(`${pid}-badge`,'LIVE','var(--amber)','var(--amber-dim)','1px solid rgba(240,165,0,0.25)');
-        const bidPrices=bids.map(b=>(b.price*100).toFixed(1)+'%');
-        const askPrices=asks.map(a=>(a.price*100).toFixed(1)+'%');
-        const allPriceLabels=[...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
-        const combinedData=allPriceLabels.map(p=>{const bid=bids.find(b=>(b.price*100).toFixed(1)+'%'===p);const ask=asks.find(a=>(a.price*100).toFixed(1)+'%'===p);return bid?bid.size:(ask?ask.size:0);});
-        const barColors=allPriceLabels.map(p=>bids.find(b=>(b.price*100).toFixed(1)+'%'===p)?'rgba(0,229,160,0.7)':'rgba(255,77,109,0.7)');
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        bodyEl.innerHTML=`<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-        if(chartInstances[pid]){chartInstances[pid].destroy();delete chartInstances[pid];}
-        const canvasEl=document.getElementById(`${pid}-canvas`);
-        if(!canvasEl) return;
-        chartInstances[pid]=new Chart(canvasEl,{type:'bar',data:{labels:allPriceLabels,datasets:[{data:combinedData,backgroundColor:barColors,borderWidth:0,barPercentage:0.8,categoryPercentage:0.9}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},plugins:{legend:{display:false},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:11},callbacks:{label:(i)=>{const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)';return` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} shares`;}}}},scales:{x:{offset:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}},border:{color:'rgba(255,255,255,0.07)'}}}}});
-        const spread=bids.length&&asks.length?((asks[0].price-bids[0].price)*100).toFixed(1):'N/A';
-        safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A'}</div></div><div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A'}</div></div><div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread!=='N/A'?spread+'%':'N/A'}</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`);
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load orderbook data.</div>');console.error(e);}
     });
   }
 
@@ -999,25 +862,6 @@
         const spread=bids.length&&asks.length?((asks[0].price-bids[0].price)*100).toFixed(1)+'%':'N/A';
         safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div><div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div><div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`);
       } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load orderbook data.</div>');console.error(e);}
-    });
-  }
-
-  // ── 🔄 TRADES (Polymarket) ─────────────────────────────
-  async function showTradesPanel(marketId, conditionId, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'trades');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'Large trades (≥$1,000) · last 7 days','LOADING','var(--text2)',subtitle);
-      try {
-        const res=await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
-        const json=await res.json();
-        const trades=(json.trades||[]).slice(0,20);
-        safeBadge(`${pid}-badge`,`${trades.length} TRADES`,'var(--text2)','var(--bg4)','1px solid var(--border2)');
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        if(!trades.length){bodyEl.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>';return;}
-        const rows=trades.map(t=>{const side=t.side==='BUY'?'<span class="buy">BUY</span>':'<span class="sell">SELL</span>';const outcome=t.is_yes_side?'<span class="yes">YES</span>':'<span class="no">NO</span>';const price=(t.price*100).toFixed(1)+'%';const amount=fmtVol(t.amount_usd);const time=fmtTime(t.timestamp);const wallet=t.user?t.user.slice(0,6)+'...'+t.user.slice(-4):'N/A';return`<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${wallet}</td></tr>`;}).join('');
-        bodyEl.innerHTML=`<div style="overflow-x:auto;margin-top:4px;"><table class="trades-table"><thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load trades data.</div>');console.error(e);}
     });
   }
 
@@ -1067,9 +911,9 @@
       panelShell(panel,title,'Market forecast history','LOADING','var(--accent)');
       try {
         const now=Math.floor(Date.now()/1000);
-        const isKalshi=exchange.toLowerCase()==='kalshi';
-        const start=isKalshi?now-(90*86400):now-(15*86400);
-        const url=isKalshi?`${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`:`${API_BASE}/get_polymarket_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&fidelity=60`;
+        // Kalshi only -- Polymarket forecasts removed for licensing. Kalshi supports 90 days.
+        const start=now-(90*86400);
+        const url=`${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`;
         const res=await fetch(url);
         if(!res.ok) throw new Error(`Forecast API error: ${res.status}`);
         const data=await res.json();
@@ -1091,31 +935,6 @@
         chartInstances[pid]=new Chart(canvasEl,{type:'line',data:{labels,datasets:[{data:values,borderColor:'#00e5a0',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,fill:true,backgroundColor:(ctx)=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,140);g.addColorStop(0,'rgba(0,229,160,0.15)');g.addColorStop(1,'rgba(0,229,160,0)');return g;},tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:12},callbacks:{label:(i)=>` Forecast: ${fmt(i.raw)}`}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{min:Math.min(...values)-Math.abs(Math.min(...values)*0.02),max:Math.max(...values)+Math.abs(Math.max(...values)*0.02),grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmt(v)},border:{color:'rgba(255,255,255,0.07)'}}}}});
         safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div><div class="stat"><div class="stat-label">Change</div><div class="stat-value ${change>=0?'up':'down'}">${change>=0?'+':''}${fmt(change)}</div></div><div class="stat"><div class="stat-label">High</div><div class="stat-value">${fmt(Math.max(...values))}</div></div><div class="stat"><div class="stat-label">Low</div><div class="stat-value">${fmt(Math.min(...values))}</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">Source</div><div class="stat-value" style="font-size:11px;">${exchange.toUpperCase()}</div></div>`);
       } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load forecast data.</div>');console.error(e);}
-    });
-  }
-
-  // ── ⇄ CROSS-PLATFORM MATCHING ──────────────────────────
-  async function showMatchingPanel(marketId, matchParam, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'matching');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'Cross-platform equivalent markets','LOADING','var(--blue)',subtitle);
-      try {
-        const res=await fetch(`${PREDEXON_MATCH}?${matchParam}&match_type=all`);
-        if(!res.ok) throw new Error(`Matching API ${res.status}`);
-        const data=await res.json();
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        const matchesObj=data.matches||{},allExact=[],allRelated=[];
-        Object.entries(matchesObj).forEach(([platform,bucket])=>{(bucket.exact||[]).forEach(m=>allExact.push({...m,_platform:platform}));(bucket.related||[]).forEach(m=>allRelated.push({...m,_platform:platform}));});
-        const total=allExact.length+allRelated.length;
-        if(total===0){safeBadge(`${pid}-badge`,'NO MATCHES','var(--text3)','var(--bg4)','1px solid var(--border2)');bodyEl.innerHTML='<div class="match-no-results">No equivalent markets found on other platforms.</div>';return;}
-        safeBadge(`${pid}-badge`,`${total} MATCH${total!==1?'ES':''}`,'var(--blue)','var(--blue-dim)','1px solid rgba(77,166,255,0.25)');
-        function renderMatchRow(m,type){const platform=(m._platform||'').toUpperCase(),typeClass=type==='exact'?'match-type-exact':'match-type-related',typeLabel=type==='exact'?'EXACT':'RELATED';const titleText=escapeHTML(m.title||m.market_ticker||'—'),ticker=m.market_ticker?`<span class="match-ticker">${escapeHTML(m.market_ticker)}</span>`:'',slug=m.market_slug?`<span class="match-ticker">${escapeHTML(m.market_slug)}</span>`:'';let sideHTML='';if(m.side){const sideUp=m.side.toUpperCase(),sClass=sideUp==='YES'?'yes':'no';sideHTML=`<span class="match-side ${sClass}">↔ ${sideUp} side</span>`;}const statusHTML=m.status?`<span style="font-family:var(--mono);font-size:9px;color:${m.status==='active'?'var(--accent2)':'var(--text3)'};">${m.status.toUpperCase()}</span>`:'';let simHTML='';if(m.similarity!=null){const pct=Math.min(100,Math.max(0,m.similarity)),color=pct>=98?'var(--accent)':pct>=96?'var(--accent2)':'var(--amber)';simHTML=`<div class="match-sim-wrap"><div class="match-sim-bar-bg"><div class="match-sim-bar-fill" style="width:${pct}%;background:${color};"></div></div><span class="match-sim-score">${pct}</span></div>`;}const explHTML=m.explanation?`<div class="match-explanation">${escapeHTML(m.explanation)}</div>`:'';return`<div class="match-row"><div class="match-row-header"><span class="match-platform-badge ${typeClass}">${platform} · ${typeLabel}</span><span class="match-title">${titleText}</span></div><div class="match-meta">${ticker||slug}${sideHTML}${statusHTML}${simHTML}</div>${explHTML}</div>`;}
-        let html=`<div class="match-summary-stats"><div class="stat"><div class="stat-label">Exact matches</div><div class="stat-value" style="color:var(--accent);font-size:13px;">${allExact.length}</div></div><div class="stat"><div class="stat-label">Related matches</div><div class="stat-value" style="color:var(--amber);font-size:13px;">${allRelated.length}</div></div><div class="stat"><div class="stat-label">Platforms</div><div class="stat-value" style="font-size:12px;">${Object.keys(matchesObj).join(', ')}</div></div></div>`;
-        if(allExact.length){html+=`<div class="match-section-label">Exact matches &mdash; similarity &ge; 95</div>`;html+=allExact.map(m=>renderMatchRow(m,'exact')).join('');}
-        if(allRelated.length){html+=`<div class="match-section-label">Related matches &mdash; similarity 80&ndash;94</div>`;html+=allRelated.map(m=>renderMatchRow(m,'related')).join('');}
-        bodyEl.innerHTML=html;
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load matching data.</div>');console.error(e);}
     });
   }
 

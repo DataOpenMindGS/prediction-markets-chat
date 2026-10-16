@@ -530,10 +530,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
         </div>
         <div class="exch-divider"></div>
         <label class="exch-option">
-          <input type="checkbox" class="exch-cb" value="polymarket" checked>
-          <span class="exch-option-label">Polymarket</span>
-        </label>
-        <label class="exch-option">
           <input type="checkbox" class="exch-cb" value="kalshi" checked>
           <span class="exch-option-label">Kalshi</span>
         </label>
@@ -580,7 +576,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
             <th class="tbl-th">Exchanges</th>
             <th class="tbl-th num">Kalshi Forecast</th>
             <th class="tbl-th num">OMD (Kalshi)</th>
-            <th class="tbl-th num">OMD (Polymarket)</th>
             <th class="tbl-th num">OMD (ForecastEx)</th>
           </tr>
         </thead>
@@ -595,11 +590,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
   const API_BASE         = 'https://api.dataopenmind.com/public';
   const ECON_URL         = API_BASE + '/get_economic_stats';
   const OMD_PRICES       = API_BASE + '/get_daily_prices';
-  const LIVE_PRICE       = API_BASE + '/get_live_price';
-  const MKT_VOLUME       = API_BASE + '/get_market_volume';
-  const MKT_ORDERBOOK    = API_BASE + '/get_market_orderbook';
-  const MKT_TRADES       = API_BASE + '/get_market_trades';
-  const MKT_OI           = API_BASE + '/get_market_openinterest';
   const KALSHI_TRADES    = API_BASE + '/get_kalshi_trades';
   const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
   const GET_MARKETS      = API_BASE + '/get_markets';
@@ -893,11 +883,8 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       const panelDiv = document.createElement('div');
       panelDiv.className = 'cell-panel';
 
-      const isPolymarket = (event.exchange || '').toLowerCase() === 'polymarket';
       const isKalshi     = (event.exchange || '').toLowerCase() === 'kalshi';
       const marketId     = event.top_market_id;
-      const conditionId  = event.top_market_condition_id;
-      const tokenId      = event.top_market_token_id;
 
       const actions = document.createElement('div');
       actions.className = 'cell-actions';
@@ -912,14 +899,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
 
       if (marketId) {
         addBtn('📈 Price', () => showPriceChartFromCell(cell, event));
-        if (isPolymarket && conditionId) {
-          addBtn('📊 Vol',    () => showVolumePanelFromCell(cell, event));
-          addBtn('📐 OI',     () => showOIPanelFromCell(cell, event));
-          addBtn('🔄 Trades', () => showTradesPanelFromCell(cell, event));
-        }
-        if (isPolymarket && tokenId) {
-          addBtn('📖 Book', () => showOrderbookFromCell(cell, event));
-        }
         if (isKalshi) {
           const ticker = marketId.replace(/^ka_/i, '');
           addBtn('🔄 Trades', () => showKalshiTradesPanelFromCell(cell, event, ticker));
@@ -928,8 +907,8 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
         if (event.event_id) {
           addBtn('🗂 Markets', () => showMarketsPanelFromCell(cell, event));
         }
-        if (event.is_forecast_market && event.event_id) {
-          const rawId = event.event_id.replace(/^pm_|^ka_/i, '');
+        if (isKalshi && event.is_forecast_market && event.event_id) {
+          const rawId = event.event_id.replace(/^ka_/i, '');
           addBtn('📈 Forecast', () => showForecastPanelFromCell(cell, event, rawId));
         }
         if (event.event_id) {
@@ -954,7 +933,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
   async function loadForecasts(data) {
     const forecastEvents = data.filter(d => d.is_forecast_market && d.event_id);
     for (const evt of forecastEvents) {
-      const rawId    = evt.event_id.replace(/^pm_|^ka_/i, '');
+      const rawId    = evt.event_id.replace(/^ka_/i, '');
       const isKalshi = (evt.exchange || '').toLowerCase() === 'kalshi';
       const valElId  = 'cell-val-' + evt.event_id.replace(/[^a-z0-9]/gi, '_');
       const valEl    = document.getElementById(valElId);
@@ -963,21 +942,23 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       try {
         const now   = Math.floor(Date.now() / 1000);
         const nowH  = Math.floor(now / 3600) * 3600;
-        const start = isKalshi ? nowH - (90 * 86400) : nowH - (15 * 86400);
-        const url   = isKalshi
-          ? API_BASE + '/get_kalshi_forecast?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60'
-          : API_BASE + '/get_polymarket_forecast?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&fidelity=60';
-
-        const res  = await fetch(url);
-        const data = await res.json();
-        const hist = (data.history || []).filter(p => p.p != null);
+        const start = nowH - (90 * 86400);
+        // Published forecasts come from Kalshi only (Polymarket removed for licensing);
+        // other exchanges fall through to the OMD calculated forecast below.
+        let hist = [];
+        if (isKalshi) {
+          const url  = API_BASE + '/get_kalshi_forecast?event_id=' + encodeURIComponent(rawId) + '&start_ts=' + start + '&end_ts=' + nowH + '&period_interval=60';
+          const res  = await fetch(url);
+          const data = await res.json();
+          hist = (data.history || []).filter(p => p.p != null);
+        }
 
         if (hist.length) {
           const latest = hist[hist.length - 1].p;
           const fmt    = parseFloat(latest.toFixed(4)).toString();
           valEl.className   = 'cell-value forecast';
           valEl.textContent = fmt;
-          valEl.title       = 'Forecast value (' + (isKalshi ? 'Kalshi' : 'Polymarket') + ')';
+          valEl.title       = 'Forecast value (Kalshi)';
         } else {
           // Try OMD calculated forecast as secondary fallback
           try {
@@ -1078,8 +1059,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
     // Attach data attributes needed by panel functions
     const probSpan = document.createElement('span');
     probSpan.dataset.marketId    = event.top_market_id || '';
-    probSpan.dataset.tokenId     = event.top_market_token_id || '';
-    probSpan.dataset.conditionId = event.top_market_condition_id || '';
     probSpan.dataset.exchange    = event.exchange || '';
     probSpan.dataset.eventId     = event.event_id || '';
     probSpan.dataset.source      = 'omd';
@@ -1100,34 +1079,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
   function showPriceChartFromCell(cell, event) {
     const { wrapper, probSpan } = wrapCellAsCard(cell, event);
     showPriceChart(probSpan);
-    cleanupFakeCard(wrapper);
-  }
-
-  function showVolumePanelFromCell(cell, event) {
-    const { wrapper } = wrapCellAsCard(cell, event);
-    const fakeBtn = { closest: () => wrapper };
-    showVolumePanel(event.top_market_id, event.top_market_condition_id, fakeBtn);
-    cleanupFakeCard(wrapper);
-  }
-
-  function showOIPanelFromCell(cell, event) {
-    const { wrapper } = wrapCellAsCard(cell, event);
-    const fakeBtn = { closest: () => wrapper };
-    showOpenInterestPanel(event.top_market_id, event.top_market_condition_id, fakeBtn);
-    cleanupFakeCard(wrapper);
-  }
-
-  function showTradesPanelFromCell(cell, event) {
-    const { wrapper } = wrapCellAsCard(cell, event);
-    const fakeBtn = { closest: () => wrapper };
-    showTradesPanel(event.top_market_id, event.top_market_condition_id, fakeBtn);
-    cleanupFakeCard(wrapper);
-  }
-
-  function showOrderbookFromCell(cell, event) {
-    const { wrapper } = wrapCellAsCard(cell, event);
-    const fakeBtn = { closest: () => wrapper };
-    showOrderbookPanel(event.top_market_id, event.top_market_token_id, fakeBtn);
     cleanupFakeCard(wrapper);
   }
 
@@ -1228,7 +1179,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
         '<td class="tbl-td"><span class="tbl-exch">' + exchCode(evt.exchange) + '</span></td>' +
         '<td class="tbl-td num" id="tv-kalshi-' + sk + '"><span class="tbl-spinner"></span></td>' +
         '<td class="tbl-td num" id="tv-omdk-'   + sk + '"><span class="tbl-spinner"></span></td>' +
-        '<td class="tbl-td num" id="tv-omdpm-'  + sk + '"><span class="tbl-spinner"></span></td>' +
         '<td class="tbl-td num" id="tv-omdfx-'  + sk + '"><span class="tbl-spinner"></span></td>';
       tbody.appendChild(tr);
 
@@ -1238,7 +1188,7 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       trEx.className = 'expand-row';
       trEx.style.display = 'none';
       const tdEx = document.createElement('td');
-      tdEx.colSpan = 10;
+      tdEx.colSpan = 9;
       const inner = document.createElement('div');
       inner.className = 'expand-inner';
       inner.id = 'texpand-inner-' + sk;
@@ -1254,7 +1204,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
   function fmt4(v) { return v != null ? parseFloat(Number(v).toFixed(4)).toString() : null; }
   function exchCode(exch) {
     const e = (exch||'').toLowerCase();
-    if (e === 'polymarket') return 'PM';
     if (e === 'forecastex') return 'FX';
     if (e === 'kalshi')     return 'KA';
     return (exch||'').toUpperCase().slice(0,2);
@@ -1278,7 +1227,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
   // ── Batched value loading — endpoint_only=true for speed ─────────────────
   async function loadTableValuesBatched(sorted) {
     const kalshiEvts = sorted.filter(e => (e.exchange||'').toLowerCase() === 'kalshi');
-    const pmEvts     = sorted.filter(e => (e.exchange||'').toLowerCase() === 'polymarket');
     const fxEvts     = sorted.filter(e => (e.exchange||'').toLowerCase() === 'forecastex');
 
     // Helper: one batched OMD call for a group
@@ -1338,7 +1286,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
 
     // OMD batch calls — one per exchange, all events at once
     await batchOmd(kalshiEvts, 'omdk');
-    await batchOmd(pmEvts,     'omdpm');
     await batchOmd(fxEvts,     'omdfx');
 
     // Null out columns for exchanges not applicable
@@ -1349,7 +1296,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
       if (exch !== 'kalshi' || !evt.is_forecast_market)
                                  setTableCell('tv-kalshi-' + sk, null, sk);
       if (exch !== 'kalshi')     setTableCell('tv-omdk-'   + sk, null, sk);
-      if (exch !== 'polymarket') setTableCell('tv-omdpm-'  + sk, null, sk);
       if (exch !== 'forecastex') setTableCell('tv-omdfx-'  + sk, null, sk);
     });
   }
@@ -1376,17 +1322,15 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
     if (!evt) return;
 
     const isKalshi = (evt.exchange||'').toLowerCase() === 'kalshi';
-    const isPM     = (evt.exchange||'').toLowerCase() === 'polymarket';
     const isFX     = (evt.exchange||'').toLowerCase() === 'forecastex';
 
     // Load full history for the applicable OMD column
-    if (isKalshi || isPM || isFX) {
+    if (isKalshi || isFX) {
       try {
         const res  = await fetch(OMD_FORECAST + '?event_id=' + encodeURIComponent(evt.event_id));
         const data = await res.json();
         const hist = (data.history||[]).filter(p => p.p != null);
         if (isKalshi)  { fc.omdKHist  = hist; fc.omdKMethod  = data.calc_method; }
-        if (isPM)      { fc.omdPMHist = hist; fc.omdPMMethod = data.calc_method; }
         if (isFX)      { fc.omdFXHist = hist; fc.omdFXMethod = data.calc_method; }
       } catch(e) {}
     }
@@ -1414,7 +1358,6 @@ tr.data-row:hover td { background:rgba(255,255,255,0.02); }
     const series = [
       { label:'Kalshi Published',  hist:fc.kalshiFcHist, color:'#4da6ff', method:null },
       { label:'OMD (Kalshi)',      hist:fc.omdKHist,     color:'#00e5a0', method:fc.omdKMethod },
-      { label:'OMD (Polymarket)',  hist:fc.omdPMHist,    color:'#f0a500', method:fc.omdPMMethod },
       { label:'OMD (ForecastEx)',  hist:fc.omdFXHist,    color:'#a78bfa', method:fc.omdFXMethod },
     ].filter(s => s.hist && s.hist.length);
 
@@ -1537,13 +1480,10 @@ function fmtVol(v) {
       const probEl      = card.querySelector('.clickable-prob');
       if (!probEl) return;
       const marketId    = probEl.dataset.marketId;
-      const tokenId     = probEl.dataset.tokenId;
-      const conditionId = probEl.dataset.conditionId;
       const eventId     = probEl.dataset.eventId;
       const exchange    = (probEl.dataset.exchange || '').toLowerCase();
       if (!marketId) return;
 
-      const isPolymarket = exchange === 'polymarket';
       const isKalshi = exchange === 'kalshi';
       const actions = document.createElement('div');
       actions.className = 'market-actions';
@@ -1551,15 +1491,6 @@ function fmtVol(v) {
       // 📈 Price — always available if marketId present
       actions.innerHTML += `<button class="action-btn" onclick="showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'))">📈 Price</button>`;
 
-      // Polymarket-only actions
-      if (isPolymarket && conditionId) {
-        actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showTradesPanel('${marketId}','${conditionId}',this)">🔄 Trades</button>`;
-      }
-      if (isPolymarket && tokenId) {
-        actions.innerHTML += `<button class="action-btn" onclick="showOrderbookPanel('${marketId}','${tokenId}',this)">📖 Order Book</button>`;
-      }
       // Kalshi-only actions — extract ticker by stripping 'ka_' prefix
       if (isKalshi && marketId) {
         const ticker = marketId.replace(/^ka_/i, '');
@@ -1615,9 +1546,7 @@ function fmtVol(v) {
   // ── 📈 PRICE CHART ─────────────────────────────────
   async function showPriceChart(el) {
     const marketId    = el.dataset.marketId;
-    const tokenId     = el.dataset.tokenId;
-    const conditionId = el.dataset.conditionId;
-    const exchange    = el.dataset.exchange || 'Polymarket';
+    const exchange    = el.dataset.exchange || '';
     const card        = el.closest('.market-card');
     const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
@@ -1637,13 +1566,6 @@ function fmtVol(v) {
         if (!prices.length) { document.getElementById(`${pid}-body`).innerHTML = '<div class="panel-loading">No price history available.</div>'; return; }
 
         let livePrice=null, liveTime=null, hasLive=false;
-        if (exchange==='Polymarket' && tokenId) {
-          try {
-            const lr = await fetch(`${LIVE_PRICE}?token_id=${encodeURIComponent(tokenId)}`);
-            const ld = await lr.json();
-            if (ld.price!=null) { livePrice=parseFloat(ld.price); liveTime=ld.time||null; hasLive=true; }
-          } catch(e) {}
-        }
 
         const labels = prices.map(p => { const d=new Date(p.date+'T00:00:00'); return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`; });
         const data   = prices.map(p => Math.round(p.price*1000)/10);
@@ -1691,202 +1613,7 @@ function fmtVol(v) {
     });
   }
 
-  // ── 📊 VOLUME CHART ───────────────────────────────
-  async function showVolumePanel(marketId, conditionId, btn) {
-    const card = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'volume');
-
-    togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, '90-day trading volume', 'LOADING', 'var(--blue)', subtitle);
-      try {
-        const res  = await fetch(`${MKT_VOLUME}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
-        const json = await res.json();
-        const pts  = (json.data || []).sort((a,b)=>a.timestamp-b.timestamp);
-
-        if (!pts.length) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No volume data available.</div>'; return; }
-
-        const labels   = pts.map(p => fmtDate(p.timestamp));
-        const yesVol   = pts.map(p => Math.round((p.yes_volume||0)*100)/100);
-        const noVol    = pts.map(p => Math.round((p.no_volume||0)*100)/100);
-        const totalVol = pts.reduce((s,p)=>(s+(p.total_volume||0)),0);
-
-        const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent='90D'; badge.style.color='var(--blue)'; badge.style.background='var(--blue-dim)'; badge.style.border='1px solid rgba(77,166,255,0.25)';
-
-        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
-          type:'bar',
-          data:{ labels, datasets:[
-            { label:'YES', data:yesVol, backgroundColor:'rgba(0,229,160,0.7)', borderColor:'rgba(0,229,160,0.9)', borderWidth:0, stack:'vol' },
-            { label:'NO',  data:noVol,  backgroundColor:'rgba(255,77,109,0.7)', borderColor:'rgba(255,77,109,0.9)', borderWidth:0, stack:'vol' }
-          ]},
-          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
-            plugins:{ legend:{display:true, labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},
-              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
-                titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
-                callbacks:{ label:(i)=>` ${i.dataset.label}: ${fmtVol(i.raw)}` } } },
-            scales:{ x:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
-              y:{ stacked:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmtVol(v)}, border:{color:'rgba(255,255,255,0.07)'} } } }
-        });
-
-        document.getElementById(`${pid}-stats`).innerHTML = `
-          <div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">${fmtVol(totalVol)}</div></div>
-          <div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">${fmtVol(yesVol.reduce((s,v)=>s+v,0))}</div></div>
-          <div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">${fmtVol(noVol.reduce((s,v)=>s+v,0))}</div></div>`;
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load volume data.</div>'; console.error(e); }
-    });
-  }
-
-// ── 📖 ORDER BOOK ─────────────────────────────────
-  async function showOrderbookPanel(marketId, tokenId, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'orderbook');
-
-    togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
-      try {
-        const res  = await fetch(`${MKT_ORDERBOOK}?token_id=${encodeURIComponent(tokenId)}`);
-        const json = await res.json();
-        const snap = (json.snapshots||[])[0];
-
-        if (!snap) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">No orderbook data available.</div>'; return; }
-
-        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
-        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
-
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent='LIVE'; badge.style.color='var(--amber)'; badge.style.background='var(--amber-dim)'; badge.style.border='1px solid rgba(240,165,0,0.25)';
-
-        const bidPrices = bids.map(b => (b.price * 100).toFixed(1) + '%');
-        const askPrices = asks.map(a => (a.price * 100).toFixed(1) + '%');
-        const allPriceLabels = [...new Set([...bidPrices, ...askPrices])].sort((a,b) => parseFloat(a) - parseFloat(b));
-
-        // Single dataset with per-bar colors — centers each bar in its slot
-        const combinedData = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          const ask = asks.find(a => (a.price*100).toFixed(1)+'%' === p);
-          return bid ? bid.size : (ask ? ask.size : 0);
-        });
-        const barColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          return bid ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)';
-        });
-        const borderColors = allPriceLabels.map(p => {
-          const bid = bids.find(b => (b.price*100).toFixed(1)+'%' === p);
-          return bid ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)';
-        });
-
-        const body = document.getElementById(`${pid}-body`);
-        body.innerHTML = `
-          <div style="display:flex;gap:14px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span>
-            </div>
-            <div style="display:flex;align-items:center;gap:5px;">
-              <div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div>
-              <span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span>
-            </div>
-          </div>
-          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
-          <div class="panel-stats" id="${pid}-stats"></div>`;
-
-        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        chartInstances[pid] = new Chart(document.getElementById(`${pid}-canvas`), {
-          type: 'bar',
-          data: {
-            labels: allPriceLabels,
-            datasets: [{
-              data: combinedData,
-              backgroundColor: barColors,
-              borderColor: borderColors,
-              borderWidth: 0,
-              barPercentage: 0.8,
-              categoryPercentage: 0.9
-            }]
-          },
-          options: {
-            responsive: true, maintainAspectRatio: false, animation: {duration: 300},
-            plugins: {
-              legend: { display: false },
-              tooltip: {
-                backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-                titleColor: '#8a9099', bodyColor: '#f0f2f5',
-                titleFont: {family: "'IBM Plex Mono',monospace", size: 10},
-                bodyFont: {family: "'IBM Plex Mono',monospace", size: 11},
-                callbacks: {
-                  label: (i) => {
-                    const isBid = barColors[i.dataIndex] === 'rgba(0,229,160,0.7)';
-                    return ` ${isBid ? 'Bid' : 'Ask'}: ${i.raw.toLocaleString()} shares`;
-                  }
-                }
-              }
-            },
-            scales: {
-              x: { offset: true, grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}, maxRotation: 0}, border: {color: 'rgba(255,255,255,0.07)'} },
-              y: { grid: {color: 'rgba(255,255,255,0.04)'}, ticks: {color: '#8a9099', font: {family: "'IBM Plex Mono',monospace", size: 11}}, border: {color: 'rgba(255,255,255,0.07)'} }
-            }
-          }
-        });
-
-        const spread = asks.length && bids.length ? ((asks[0].price - bids[0].price)*100).toFixed(1) : 'N/A';
-        document.getElementById(`${pid}-stats`).innerHTML = `
-          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
-          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A'}</div></div>
-          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread !== 'N/A' ? spread+'%' : 'N/A'}</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp ? fmtTime(snap.timestamp/1000) : 'Recent'}</div></div>`;
-
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load orderbook data.</div>'; console.error(e); }
-    });
-  }
  
-  // ── 🔄 TRADES TABLE ───────────────────────────────
-  async function showTradesPanel(marketId, conditionId, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'trades');
-
-    togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Large trades (≥$1,000) · last 7 days', 'LOADING', 'var(--text2)', subtitle);
-      try {
-        const res  = await fetch(`${MKT_TRADES}?condition_id=${encodeURIComponent(conditionId)}&days=7&min_total=1000`);
-        const json = await res.json();
-        const trades = (json.trades || []).slice(0, 20);
-
-        const badge = document.getElementById(`${pid}-badge`);
-        badge.textContent=`${trades.length} TRADES`; badge.style.color='var(--text2)'; badge.style.background='var(--bg4)'; badge.style.border='1px solid var(--border2)';
-
-        const body = document.getElementById(`${pid}-body`);
-        if (!trades.length) { body.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>'; return; }
-
-        const rows = trades.map(t => {
-          const side    = t.side === 'BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
-          const outcome = t.is_yes_side ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
-          const price   = (t.price * 100).toFixed(1) + '%';
-          const amount  = fmtVol(t.amount_usd);
-          const time    = fmtTime(t.timestamp);
-          const wallet  = t.user ? t.user.slice(0,6)+'...'+t.user.slice(-4) : 'N/A';
-          return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${wallet}</td></tr>`;
-        }).join('');
-
-        body.innerHTML = `
-          <div style="overflow-x:auto;margin-top:4px;">
-            <table class="trades-table">
-              <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>`;
-      } catch(e) { document.getElementById(`${pid}-body`).innerHTML='<div class="panel-loading">Failed to load trades data.</div>'; console.error(e); }
-    });
-  }
 
   // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
   async function showKalshiTradesPanel(marketId, ticker, btn) {
@@ -2081,65 +1808,6 @@ function fmtVol(v) {
     });
   }
 
-async function showOpenInterestPanel(marketId, conditionId, btn) {
-  const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-  const pid   = panelId(marketId, 'oi');
-
-  togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)', subtitle);
-    try {
-      const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
-      const json = await res.json();
-      const pts = (json.open_interest_over_time || []).sort((a,b) => a.timestamp - b.timestamp);
-
-      if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No open interest data available.</div>'); return; }
-
-      const labels  = pts.map(p => fmtDate(p.timestamp));
-      const data = pts.map(p => Math.round((p.open_interest_usd || 0) * 100) / 100);
-      const currOI  = data[data.length - 1];
-      const prevOI  = data[0];
-      const chOI    = currOI - prevOI;
-
-      const bodyEl = document.getElementById(`${pid}-body`);
-      if (!bodyEl) return;
-      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-
-      safeBadge(`${pid}-badge`, '90D', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
-
-      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-      const canvasEl = document.getElementById(`${pid}-canvas`);
-      if (!canvasEl) return;
-      chartInstances[pid] = new Chart(canvasEl, {
-        type: 'line',
-        data: { labels, datasets: [{ data, borderColor: '#f0a500', borderWidth: 1.5,
-          pointRadius: 0, pointHoverRadius: 4, fill: true,
-          backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(240,165,0,0.15)'); g.addColorStop(1,'rgba(240,165,0,0)'); return g; },
-          tension: 0.3 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
-          interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-            titleColor: '#8a9099', bodyColor: '#f0f2f5',
-            titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
-            bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
-            callbacks: { label: (i) => ` ${fmtVol(i.raw)}` } } },
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
-          } }
-      });
-
-      safeHTML(`${pid}-stats`, `
-        <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
-        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
-        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
-        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
-    } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
-  });
-}
-
 async function showMarketsPanel(marketId, eventId, btn) {
   const card  = btn.closest('.market-card');
   const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
@@ -2206,15 +1874,9 @@ async function showMarketsPanel(marketId, eventId, btn) {
 
     try {
       const now      = Math.floor(Date.now() / 1000);
-      const isKalshi = exchange.toLowerCase() === 'kalshi';
-      const start    = isKalshi
-        ? now - (90 * 86400)   // Kalshi supports 90 days
-        : now - (15 * 86400);  // Polymarket max is 15 days
-
-      // Choose endpoint based on exchange
-      const url = isKalshi
-        ? `${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`
-        : `${API_BASE}/get_polymarket_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&fidelity=60`;
+      // Kalshi only -- Polymarket forecasts removed for licensing. Kalshi supports 90 days.
+      const start    = now - (90 * 86400);
+      const url      = `${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`;
 
       const res  = await fetch(url);
       if (!res.ok) throw new Error(`Forecast API error: ${res.status}`);
@@ -2228,8 +1890,8 @@ async function showMarketsPanel(marketId, eventId, btn) {
       }
 
       // Normalize values:
-      // Kalshi returns raw decimal (0.21 = 0.21%), Polymarket returns display units (3.65 = 3.65%)
-      // Both should be displayed as-is since they're already in the right scale for their markets
+      // Kalshi returns raw decimal (0.21 = 0.21%)
+      // Displayed as-is since it is already in the right scale for the market
       const pts = raw
         .filter(d => d.p !== null && d.p !== undefined && Math.abs(d.p) < 1000)
         .sort((a, b) => a.t - b.t);
