@@ -212,14 +212,9 @@
 <script>
   const API_BASE       = 'https://api.dataopenmind.com/public';
   const OMD_PRICES     = API_BASE + '/get_daily_prices';
-  const LIVE_PRICE     = API_BASE + '/get_live_price';
-  const MKT_VOLUME     = API_BASE + '/get_market_volume';
-  const MKT_ORDERBOOK  = API_BASE + '/get_market_orderbook';
-  const MKT_TRADES     = API_BASE + '/get_market_trades';
   const KALSHI_TRADES    = API_BASE + '/get_kalshi_trades';
   const KALSHI_ORDERBOOK = API_BASE + '/get_kalshi_orderbook';
   const STOCK_PRICES   = API_BASE + '/get_stock_prices';
-  const MKT_OI = API_BASE + '/get_market_openinterest';
   const GET_MARKETS = API_BASE + '/get_markets';
 
   let allMarkets   = [];
@@ -422,21 +417,16 @@
 
   function buildMarketCard(m, ticker) {
     const wrapper = document.createElement('div');
-    const isPolymarket = (m.exchange||'').toLowerCase() === 'polymarket';
     const isKalshi     = (m.exchange||'').toLowerCase() === 'kalshi';
     const price    = m.top_market_last_price;
     const pClass   = probClass(price);
     const pct      = price!=null ? Math.round(price*100)+'%' : 'N/A';
     const subtitle = m.top_market_subtitle && m.top_market_subtitle!=='Not available' ? m.top_market_subtitle : null;
     const titleText = m.event_title + (subtitle ? ' · ' + subtitle : '');
-    const slug = isPolymarket && m.event_url ? m.event_url.split('/').pop() : null;
 
     let dataAttrs = '';
     if(m.top_market_id) {
       dataAttrs = 'data-market-id="' + m.top_market_id + '"';
-      if(m.top_market_token_id && isPolymarket) dataAttrs += ' data-token-id="' + m.top_market_token_id + '"';
-      if(m.top_market_condition_id && isPolymarket) dataAttrs += ' data-condition-id="' + m.top_market_condition_id + '"';
-      if(slug) dataAttrs += ' data-slug="' + slug + '"';
       dataAttrs += ' data-exchange="' + (m.exchange||'') + '" data-source="omd"' + (m.event_id ? ' data-event-id="' + m.event_id + '"' : '') + ' onclick="showPriceChart(this)"';
     }
 
@@ -455,20 +445,10 @@
     const card = wrapper.querySelector('.market-card');
     if(m.top_market_id) {
       const marketId    = m.top_market_id;
-      const tokenId     = m.top_market_token_id;
-      const conditionId = m.top_market_condition_id;
       const actions = document.createElement('div');
       actions.className = 'market-actions';
       actions.innerHTML += '<button class="action-btn" onclick="showPriceChart(this.closest(\'.market-card\').querySelector(\'.clickable-prob\'))">&#128200; Price</button>';
      
-     if(isPolymarket && conditionId) {
-        actions.innerHTML += `<button class="action-btn" onclick="showVolumePanel('${marketId}','${conditionId}',this)">📊 Volume</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showOpenInterestPanel('${marketId}','${conditionId}',this)">📐 Open Interest</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showTradesPanel('${marketId}','${conditionId}',this)">🔄 Trades</button>`;
-      }
-      if(isPolymarket && tokenId) {
-        actions.innerHTML += '<button class="action-btn" onclick="showOrderbookPanel(\'' + marketId + '\',\'' + tokenId + '\',this)">&#128214; Order Book</button>';
-      }
       if(isKalshi && marketId) {
         const rawTicker = marketId.replace(/^ka_/i,'');
         actions.innerHTML += '<button class="action-btn" onclick="showKalshiTradesPanel(\'' + marketId + '\',\'' + rawTicker + '\',this)">&#128260; Trades</button>';
@@ -527,8 +507,6 @@
   async function showPriceChart(el) {
     if(!el) return;
     const marketId = el.dataset.marketId;
-    const tokenId  = el.dataset.tokenId;
-    const exchange = el.dataset.exchange || 'Polymarket';
     const card     = el.closest('.market-card');
     const title    = card && card.querySelector('.market-title') && card.querySelector('.market-title').childNodes[0] ? card.querySelector('.market-title').childNodes[0].textContent.trim() : 'Market';
     const pid      = panelId(marketId, 'price');
@@ -542,13 +520,6 @@
           .map(function(r){return {date:r.end_period_date, price:parseFloat(r.close_price)};});
         if(!prices.length) { safeHTML(pid+'-body','<div class="panel-loading">No price history available.</div>'); return; }
         let livePrice=null,liveTime=null,hasLive=false;
-        if(exchange==='Polymarket' && tokenId) {
-          try {
-            const lr = await fetch(LIVE_PRICE + '?token_id=' + encodeURIComponent(tokenId));
-            const ld = await lr.json();
-            if(ld.price!=null){livePrice=parseFloat(ld.price);liveTime=ld.time||null;hasLive=true;}
-          } catch(e){}
-        }
         const labels = prices.map(function(p){const d=new Date(p.date+'T00:00:00');return (d.getMonth()+1)+'/'+d.getDate()+'/'+String(d.getFullYear()).slice(2);});
         const data   = prices.map(function(p){return Math.round(p.price*1000)/10;});
         if(hasLive){const ld=liveTime?new Date(liveTime*1000):new Date();labels.push((ld.getMonth()+1)+'/'+ld.getDate()+'/'+String(ld.getFullYear()).slice(2)+' \u25b2');data.push(Math.round(livePrice*1000)/10);}
@@ -568,32 +539,6 @@
     });
   }
 
-  async function showVolumePanel(marketId, conditionId, btn) {
-    const card=btn.closest('.market-card');
-    const title=card&&card.querySelector('.market-title')&&card.querySelector('.market-title').childNodes[0]?card.querySelector('.market-title').childNodes[0].textContent.trim():'Market';
-    const pid=panelId(marketId,'volume');
-    togglePanel(card,pid,async function(panel){
-      panelShell(panel,title,'90-day trading volume','LOADING','var(--blue)');
-      try{
-        const res=await fetch(MKT_VOLUME+'?condition_id='+encodeURIComponent(conditionId)+'&days=90');
-        const json=await res.json();
-        const pts=(json.data||[]).sort(function(a,b){return a.timestamp-b.timestamp;});
-        if(!pts.length){safeHTML(pid+'-body','<div class="panel-loading">No volume data available.</div>');return;}
-        const labels=pts.map(function(p){return fmtDate(p.timestamp);});
-        const yesVol=pts.map(function(p){return Math.round((p.yes_volume||0)*100)/100;});
-        const noVol=pts.map(function(p){return Math.round((p.no_volume||0)*100)/100;});
-        const totalVol=pts.reduce(function(s,p){return s+(p.total_volume||0);},0);
-        const bodyEl=document.getElementById(pid+'-body'); if(!bodyEl) return;
-        bodyEl.innerHTML='<div class="panel-wrap"><canvas id="'+pid+'-canvas"></canvas></div><div class="panel-stats" id="'+pid+'-stats"></div>';
-        safeBadge(pid+'-badge','90D','var(--blue)','var(--blue-dim)','1px solid rgba(77,166,255,0.25)');
-        if(chartInstances[pid]){chartInstances[pid].destroy();delete chartInstances[pid];}
-        const canvasEl=document.getElementById(pid+'-canvas'); if(!canvasEl) return;
-        chartInstances[pid]=new Chart(canvasEl,{type:'bar',data:{labels,datasets:[{label:'YES',data:yesVol,backgroundColor:'rgba(0,229,160,0.7)',borderWidth:0,stack:'vol'},{label:'NO',data:noVol,backgroundColor:'rgba(255,77,109,0.7)',borderWidth:0,stack:'vol'}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},plugins:{legend:{display:true,labels:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},boxWidth:10}},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:11},callbacks:{label:function(i){return ' '+i.dataset.label+': '+fmtVol(i.raw);}}}},scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:function(v){return fmtVol(v);}},border:{color:'rgba(255,255,255,0.07)'}}}}});
-        safeHTML(pid+'-stats','<div class="stat"><div class="stat-label">Total 90D Volume</div><div class="stat-value">'+fmtVol(totalVol)+'</div></div><div class="stat"><div class="stat-label">YES Volume</div><div class="stat-value up">'+fmtVol(yesVol.reduce(function(s,v){return s+v;},0))+'</div></div><div class="stat"><div class="stat-label">NO Volume</div><div class="stat-value down">'+fmtVol(noVol.reduce(function(s,v){return s+v;},0))+'</div></div>');
-      }catch(e){safeHTML(pid+'-body','<div class="panel-loading">Failed to load volume data.</div>');console.error(e);}
-    });
-  }
-
   function buildOrderbookChart(pid, bids, asks, isKalshi) {
     const bidPrices=bids.map(function(b){return (b.price*100).toFixed(1)+'%';});
     const askPrices=asks.map(function(a){return (a.price*100).toFixed(1)+'%';});
@@ -607,46 +552,6 @@
     const canvasEl=document.getElementById(pid+'-canvas'); if(!canvasEl) return;
     chartInstances[pid]=new Chart(canvasEl,{type:'bar',data:{labels:allPriceLabels,datasets:[{data:combinedData,backgroundColor:barColors,borderColor:borderColors,borderWidth:0,barPercentage:0.8,categoryPercentage:0.9}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},plugins:{legend:{display:false},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:11},callbacks:{label:function(i){const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)';return ' '+(isBid?'Bid':'Ask')+': '+i.raw.toLocaleString()+' '+(isKalshi?'contracts':'shares');}}}},scales:{x:{offset:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}},border:{color:'rgba(255,255,255,0.07)'}}}}}); 
     return barColors;
-  }
-
-  async function showOrderbookPanel(marketId, tokenId, btn) {
-    const card=btn.closest('.market-card');
-    const title=card&&card.querySelector('.market-title')&&card.querySelector('.market-title').childNodes[0]?card.querySelector('.market-title').childNodes[0].textContent.trim():'Market';
-    const pid=panelId(marketId,'orderbook');
-    togglePanel(card,pid,async function(panel){
-      panelShell(panel,title,'Current order book depth','LOADING','var(--amber)');
-      try{
-        const res=await fetch(MKT_ORDERBOOK+'?token_id='+encodeURIComponent(tokenId));
-        const json=await res.json();
-        const snap=(json.snapshots||[])[0];
-        if(!snap){safeHTML(pid+'-body','<div class="panel-loading">No orderbook data available.</div>');return;}
-        const bids=(snap.bids||[]).sort(function(a,b){return b.price-a.price;}).slice(0,15);
-        const asks=(snap.asks||[]).sort(function(a,b){return a.price-b.price;}).slice(0,15);
-        safeBadge(pid+'-badge','LIVE','var(--amber)','var(--amber-dim)','1px solid rgba(240,165,0,0.25)');
-        buildOrderbookChart(pid, bids, asks, false);
-        const spread=asks.length&&bids.length?((asks[0].price-bids[0].price)*100).toFixed(1):'N/A';
-        safeHTML(pid+'-stats','<div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">'+(bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A')+'</div></div><div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">'+(asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A')+'</div></div><div class="stat"><div class="stat-label">Spread</div><div class="stat-value">'+(spread!=='N/A'?spread+'%':'N/A')+'</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">'+(snap.timestamp?fmtTime(snap.timestamp/1000):'Recent')+'</div></div>');
-      }catch(e){safeHTML(pid+'-body','<div class="panel-loading">Failed to load orderbook data.</div>');console.error(e);}
-    });
-  }
-
-  async function showTradesPanel(marketId, conditionId, btn) {
-    const card=btn.closest('.market-card');
-    const title=card&&card.querySelector('.market-title')&&card.querySelector('.market-title').childNodes[0]?card.querySelector('.market-title').childNodes[0].textContent.trim():'Market';
-    const pid=panelId(marketId,'trades');
-    togglePanel(card,pid,async function(panel){
-      panelShell(panel,title,'Large trades (\u2265$1,000) \u00b7 last 7 days','LOADING','var(--text2)');
-      try{
-        const res=await fetch(MKT_TRADES+'?condition_id='+encodeURIComponent(conditionId)+'&days=7&min_total=1000');
-        const json=await res.json();
-        const trades=(json.trades||[]).slice(0,20);
-        safeBadge(pid+'-badge',trades.length+' TRADES','var(--text2)','var(--bg4)','1px solid var(--border2)');
-        const bodyEl=document.getElementById(pid+'-body'); if(!bodyEl) return;
-        if(!trades.length){bodyEl.innerHTML='<div class="panel-loading">No large trades found in the last 7 days.</div>';return;}
-        const rows=trades.map(function(t){return '<tr><td>'+fmtTime(t.timestamp)+'</td><td>'+(t.side==='BUY'?'<span class="buy">BUY</span>':'<span class="sell">SELL</span>')+'</td><td>'+(t.is_yes_side?'<span class="yes">YES</span>':'<span class="no">NO</span>')+'</td><td>'+(t.price*100).toFixed(1)+'%</td><td>'+fmtVol(t.amount_usd)+'</td><td style="color:var(--text3)">'+(t.user?t.user.slice(0,6)+'...'+t.user.slice(-4):'N/A')+'</td></tr>';}).join('');
-        bodyEl.innerHTML='<div style="overflow-x:auto;margin-top:4px;"><table class="trades-table"><thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>Amount</th><th>Wallet</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
-      }catch(e){safeHTML(pid+'-body','<div class="panel-loading">Failed to load trades data.</div>');console.error(e);}
-    });
   }
 
   async function showKalshiTradesPanel(marketId, ticker, btn) {
@@ -690,64 +595,6 @@
       }catch(e){safeHTML(pid+'-body','<div class="panel-loading">Failed to load orderbook data.</div>');console.error(e);}
     });
   }
-
-async function showOpenInterestPanel(marketId, conditionId, btn) {
-  const card  = btn.closest('.market-card');
-  const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-  const pid   = panelId(marketId, 'oi');
-
-  togglePanel(card, pid, async (panel) => {
-    panelShell(panel, title, '90-day open interest', 'LOADING', 'var(--amber)');
-    try {
-      const res  = await fetch(`${MKT_OI}?condition_id=${encodeURIComponent(conditionId)}&days=90`);
-      const json = await res.json();
-      const pts = (json.open_interest_over_time || []).sort((a,b) => a.timestamp - b.timestamp);
-
-      if (!pts.length) { safeHTML(`${pid}-body`, '<div class="panel-loading">No open interest data available.</div>'); return; }
-
-      const labels  = pts.map(p => fmtDate(p.timestamp));
-      const data = pts.map(p => Math.round((p.open_interest_usd || 0) * 100) / 100);
-      const currOI  = data[data.length - 1];
-      const prevOI  = data[0];
-      const chOI    = currOI - prevOI;
-
-      const bodyEl = document.getElementById(`${pid}-body`);
-      if (!bodyEl) return;
-      bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-
-      safeBadge(`${pid}-badge`, '90D', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
-
-      if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-      const canvasEl = document.getElementById(`${pid}-canvas`);
-      if (!canvasEl) return;
-      chartInstances[pid] = new Chart(canvasEl, {
-        type: 'line',
-        data: { labels, datasets: [{ data, borderColor: '#f0a500', borderWidth: 1.5,
-          pointRadius: 0, pointHoverRadius: 4, fill: true,
-          backgroundColor: (ctx) => { const g = ctx.chart.ctx.createLinearGradient(0,0,0,140); g.addColorStop(0,'rgba(240,165,0,0.15)'); g.addColorStop(1,'rgba(240,165,0,0)'); return g; },
-          tension: 0.3 }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 400 },
-          interaction: { mode: 'index', intersect: false },
-          plugins: { legend: { display: false }, tooltip: { backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
-            titleColor: '#8a9099', bodyColor: '#f0f2f5',
-            titleFont: { family: "'IBM Plex Mono',monospace", size: 10 },
-            bodyFont:  { family: "'IBM Plex Mono',monospace", size: 12 },
-            callbacks: { label: (i) => ` ${fmtVol(i.raw)}` } } },
-          scales: {
-            x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, maxTicksLimit: 10, maxRotation: 0 }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } },
-            y2: { position: 'right', min: Math.min(...data), max: Math.max(...data), grid: { drawOnChartArea: false }, ticks: { color: '#8a9099', font: { family: "'IBM Plex Mono',monospace", size: 11 }, callback: v => fmtVol(v) }, border: { color: 'rgba(255,255,255,0.07)' } }
-          } }
-      });
-
-      safeHTML(`${pid}-stats`, `
-        <div class="stat"><div class="stat-label">Current OI</div><div class="stat-value">${fmtVol(currOI)}</div></div>
-        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${chOI>=0?'up':'down'}">${chOI>=0?'+':''}${fmtVol(Math.abs(chOI))}</div></div>
-        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmtVol(Math.max(...data))}</div></div>
-        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmtVol(Math.min(...data))}</div></div>`);
-    } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load open interest data.</div>'); console.error(e); }
-  });
-}
 
 async function showMarketsPanel(marketId, eventId, btn) {
   const card  = btn.closest('.market-card');
