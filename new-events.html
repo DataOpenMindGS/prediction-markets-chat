@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>New Event Tracking</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --purple:#a78bfa; --purple-dim:rgba(167,139,250,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
+  }
+  html,body { min-height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  #app { display:flex; flex-direction:column; min-height:100vh; }
+  #header { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; position:sticky; top:42px; z-index:100; }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .logo-box { width:30px; height:30px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .header-title { font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0.08em; color:var(--text); }
+  .header-sub { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.06em; margin-top:1px; }
+  .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10px; color:var(--accent2); letter-spacing:0.06em; }
+  .live-dot { width:5px; height:5px; background:var(--accent); border-radius:50%; animation:livepulse 2s ease-in-out infinite; }
+  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  #filter-bar { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; flex-shrink:0; }
+  .filter-group { display:flex; flex-direction:column; gap:4px; }
+  .filter-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
+  .chips { display:flex; gap:4px; flex-wrap:wrap; }
+  .chip { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:6px 11px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .chip:hover { border-color:rgba(0,229,160,0.35); color:var(--text); }
+  .chip.active { background:var(--accent-dim); border-color:rgba(0,229,160,0.35); color:var(--accent); }
+  input[type="number"] { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:6px 10px; color:var(--text2); font-family:var(--mono); font-size:11px; width:86px; }
+  input[type="number"]:focus { outline:none; border-color:rgba(0,229,160,0.35); color:var(--text); }
+  .btn-apply { background:var(--accent); border:none; border-radius:7px; padding:7px 16px; color:#090d12; font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.04em; cursor:pointer; transition:background 0.15s; white-space:nowrap; }
+  .btn-apply:hover { background:var(--accent2); }
+
+  #results-bar { display:flex; align-items:center; padding:8px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  #results-count { font-family:var(--mono); font-size:11px; color:var(--text3); letter-spacing:0.04em; }
+  #main { flex:1; padding:16px; display:flex; flex-direction:column; gap:16px; }
+
+  .state-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:12px; text-align:center; }
+  .state-title { font-family:var(--mono); font-size:13px; color:var(--text2); letter-spacing:0.04em; }
+  .state-sub { font-size:12px; color:var(--text3); max-width:320px; line-height:1.6; }
+  .spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Category tiles */
+  #tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; }
+  .tile { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px 8px; cursor:pointer; transition:border-color 0.15s, background 0.15s; text-align:left; color:inherit; font:inherit; display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .tile:hover { border-color:var(--border2); background:rgba(255,255,255,0.015); }
+  .tile.selected { border-color:rgba(0,229,160,0.45); background:var(--accent-dim); }
+  .tile.all { grid-column:span 2; }
+  .tile-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .tile-name { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; text-transform:uppercase; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile-total { font-family:var(--mono); font-size:15px; font-weight:500; color:var(--text); flex-shrink:0; }
+  .tile svg { display:block; width:100%; height:34px; }
+  .tile-foot { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.04em; }
+  @media (max-width:520px) { .tile.all { grid-column:span 1; } #tiles { grid-template-columns:1fr 1fr; } .tile.all { grid-column:1 / -1; } }
+
+  /* Detail panel */
+  .panel { background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius); padding:14px; animation:fadeUp 0.2s ease; min-width:0; }
+  .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .panel-title { font-family:var(--mono); font-size:12px; color:var(--text); letter-spacing:0.06em; }
+  .panel-sub { font-family:var(--mono); font-size:10px; color:var(--text3); margin-top:2px; letter-spacing:0.03em; }
+  .panel-note { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .panel-note a { color:var(--accent2); text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3); cursor:pointer; }
+  .chart-wrap { position:relative; height:200px; }
+
+  .list-meta { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; margin:14px 0 6px; }
+  .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:8px; }
+  table.events { width:100%; border-collapse:collapse; }
+  table.events th { position:sticky; top:0; background:var(--bg3); font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; padding:7px 10px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+  table.events td { font-size:12px; color:var(--text2); padding:7px 10px; border-bottom:1px solid var(--border); vertical-align:top; }
+  table.events tr:last-child td { border-bottom:none; }
+  table.events tr:hover td { background:rgba(255,255,255,0.015); }
+  table.events .num { text-align:right; font-family:var(--mono); font-size:11px; white-space:nowrap; }
+  table.events .mono { font-family:var(--mono); font-size:11px; white-space:nowrap; color:var(--text3); }
+  table.events .title { color:var(--text); min-width:220px; }
+  .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); white-space:nowrap; }
+  .error { color:var(--red); }
+
+  /* ── Site Nav ── */
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; min-width:0; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; overflow-x:auto; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s,border-color 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+  .site-nav-right { display:flex; align-items:center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<div id="site-nav">
+  <div class="site-nav-left">
+    <div class="site-nav-logo">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+      </svg>
+    </div>
+    <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+    <div class="site-nav-divider"></div>
+    <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="text-search.html">TEXT SEARCH</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="world-map.html">WORLD MAP</a>
+        <a href="economic-stats.html">ECONOMIC STATS</a>
+        <a href="companies.html">COMPANY MARKETS</a>
+        <a href="new-events.html" class="active">NEW EVENTS</a>
+        <a href="market-cap.html">MARKET CAP</a>
+        <a href="analysis.html">ANALYSIS</a>
+      </div>
+  </div>
+  <div class="site-nav-right"></div>
+</div>
+
+  <div id="header">
+    <div class="header-left">
+      <div class="logo-box">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="2"  y="9" width="2.6" height="5" rx="0.8" fill="#090d12"/>
+          <rect x="6.7" y="5" width="2.6" height="9" rx="0.8" fill="#090d12"/>
+          <rect x="11.4" y="2" width="2.6" height="12" rx="0.8" fill="#090d12"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">NEW EVENT TRACKING</div>
+        <div class="header-sub">NEWLY LISTED EVENTS ACROSS ALL TRACKED EXCHANGES</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>DAILY</div>
+  </div>
+
+  <div id="filter-bar">
+    <div class="filter-group">
+      <div class="filter-label">Lookback</div>
+      <div class="chips" id="quick-days">
+        <button class="chip" data-days="7">7D</button>
+        <button class="chip" data-days="14">14D</button>
+        <button class="chip" data-days="30">30D</button>
+        <button class="chip" data-days="60">60D</button>
+        <button class="chip" data-days="90">90D</button>
+      </div>
+    </div>
+    <div class="filter-group">
+      <div class="filter-label">Custom (days, max 90)</div>
+      <div class="chips">
+        <input type="number" id="f-days" min="1" max="90" step="1" value="14">
+        <button class="btn-apply" id="btn-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="results-bar">
+    <div id="results-count">Loading…</div>
+  </div>
+
+  <div id="main">
+    <div id="tiles"></div>
+    <div id="detail"></div>
+  </div>
+
+<script>
+  const API_BASE = 'https://api.dataopenmind.com/public';
+  const DEFAULT_DAYS = 14, MAX_DAYS = 90;
+
+  let summary = null;          // /get_new_events_summary response
+  let selected = 'All';        // selected category
+  let selectedDay = null;      // day the list is narrowed to, or null for the whole window
+  let summarySeq = 0, listSeq = 0;
+  let detailChart = null;
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function whole(n) { return n == null ? '–' : Math.round(n).toLocaleString('en-US'); }
+  function compact(v) {
+    if (v == null) return '–';
+    const a = Math.abs(v);
+    if (a >= 1e9) return (v / 1e9).toFixed(2) + 'B';
+    if (a >= 1e6) return (v / 1e6).toFixed(2) + 'M';
+    if (a >= 1e4) return (v / 1e3).toFixed(1) + 'K';
+    return Math.round(v).toLocaleString('en-US');
+  }
+  function shortDate(iso) {
+    const [y, m, d] = iso.split('-');
+    return Number(m) + '/' + Number(d);
+  }
+  function catLabel(c) { return c === 'All' ? 'All categories' : c; }
+
+  function readDays() {
+    const input = document.getElementById('f-days');
+    let n = parseInt(input.value, 10);
+    if (!Number.isFinite(n) || n < 1) n = DEFAULT_DAYS;
+    n = Math.min(MAX_DAYS, n);
+    input.value = n;
+    return n;
+  }
+
+  // Small bar chart for a tile; each tile has its own scale.
+  function sparkBars(counts) {
+    const w = 200, h = 34, n = counts.length, max = Math.max(1, ...counts);
+    const slot = w / n, bw = Math.max(1, slot * 0.72);
+    let out = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">';
+    counts.forEach((v, i) => {
+      if (!v) return;
+      const bh = Math.max(1, (v / max) * (h - 2));
+      out += '<rect x="' + (i * slot + (slot - bw) / 2).toFixed(2) + '" y="' + (h - bh).toFixed(2) +
+             '" width="' + bw.toFixed(2) + '" height="' + bh.toFixed(2) + '" rx="1" fill="#00e5a0" opacity="0.8"/>';
+    });
+    return out + '</svg>';
+  }
+
+  function renderTiles() {
+    const box = document.getElementById('tiles');
+    box.innerHTML = summary.categories.map(c => {
+      const peak = Math.max(...c.counts);
+      const avg = c.total / summary.dates.length;
+      return '<button class="tile' + (c.category === 'All' ? ' all' : '') + (c.category === selected ? ' selected' : '') +
+        '" data-category="' + esc(c.category) + '" title="' + esc(catLabel(c.category) + ': ' + whole(c.total) + ' new events, busiest day ' + whole(peak)) + '">' +
+        '<div class="tile-top"><span class="tile-name">' + esc(catLabel(c.category)) + '</span><span class="tile-total">' + esc(compact(c.total)) + '</span></div>' +
+        sparkBars(c.counts) +
+        '<div class="tile-foot">avg ' + esc(avg < 10 ? avg.toFixed(1) : whole(avg)) + '/day · peak ' + esc(whole(peak)) + '</div>' +
+        '</button>';
+    }).join('');
+    box.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => {
+      selected = t.dataset.category;
+      selectedDay = null;
+      renderTiles();
+      renderDetail();
+      document.getElementById('detail').scrollIntoView({behavior: 'smooth', block: 'start'});
+    }));
+  }
+
+  function renderDetail() {
+    const cell = summary.categories.find(c => c.category === selected);
+    const avg = cell.total / summary.dates.length;
+    document.getElementById('detail').innerHTML =
+      '<div class="panel">' +
+        '<div class="panel-header"><div><div class="panel-title">' + esc(catLabel(selected).toUpperCase()) + ' · NEW EVENTS PER DAY</div>' +
+        '<div class="panel-sub">' + esc(whole(cell.total)) + ' events · ' + esc(summary.start_date) + ' to ' + esc(summary.end_date) + ' (ET) · avg ' +
+        esc(avg < 10 ? avg.toFixed(1) : whole(avg)) + '/day</div></div>' +
+        '<div class="panel-note" id="day-note"></div></div>' +
+        '<div class="chart-wrap"><canvas id="detail-canvas"></canvas></div>' +
+        '<div id="event-list"></div>' +
+      '</div>';
+    renderDetailChart();
+    loadList();
+  }
+
+  function renderDayNote() {
+    const note = document.getElementById('day-note');
+    if (!note) return;
+    if (selectedDay) {
+      note.innerHTML = 'Listing ' + esc(selectedDay) + ' · <a id="all-days">all days</a>';
+      document.getElementById('all-days').addEventListener('click', () => { selectedDay = null; updateBarColors(); renderDayNote(); loadList(); });
+    } else {
+      note.textContent = 'Click a bar to list that day';
+    }
+  }
+
+  function barColors() {
+    return summary.dates.map(d => !selectedDay || d === selectedDay ? 'rgba(0,229,160,0.75)' : 'rgba(0,229,160,0.22)');
+  }
+  function updateBarColors() {
+    if (!detailChart) return;
+    detailChart.data.datasets[0].backgroundColor = barColors();
+    detailChart.update('none');
+  }
+
+  function renderDetailChart() {
+    const cell = summary.categories.find(c => c.category === selected);
+    if (detailChart) { detailChart.destroy(); detailChart = null; }
+    const canvas = document.getElementById('detail-canvas');
+    const mono = "'IBM Plex Mono',monospace";
+    detailChart = new Chart(canvas, {
+      type: 'bar',
+      data: { labels: summary.dates.map(shortDate), datasets: [{ data: cell.counts, backgroundColor: barColors(), hoverBackgroundColor: '#00e5a0', borderRadius: 2, maxBarThickness: 28 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: { duration: 300 },
+        // Whole column is clickable/hoverable, so short bars are easy to hit.
+        interaction: { mode: 'index', intersect: false },
+        onClick: (evt, els) => {
+          if (!els.length) return;
+          const d = summary.dates[els[0].index];
+          selectedDay = selectedDay === d ? null : d;
+          updateBarColors(); renderDayNote(); loadList();
+        },
+        onHover: (evt, els) => { evt.native.target.style.cursor = els.length ? 'pointer' : 'default'; },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            titleColor: '#8a9099', bodyColor: '#f0f2f5',
+            titleFont: { family: mono, size: 10 }, bodyFont: { family: mono, size: 12 },
+            callbacks: { title: items => summary.dates[items[0].dataIndex], label: i => ' ' + whole(i.raw) + ' new events' }
+          }
+        },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: '#8a9099', font: { family: mono, size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, border: { color: 'rgba(255,255,255,0.07)' } },
+          y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: mono, size: 10 }, callback: v => compact(v), maxTicksLimit: 5 }, border: { display: false } }
+        }
+      }
+    });
+    renderDayNote();
+  }
+
+  async function loadList() {
+    const seq = ++listSeq;
+    const box = document.getElementById('event-list');
+    if (!box) return;
+    box.innerHTML = '<div class="list-meta">Loading events…</div>';
+    const params = new URLSearchParams({ days: summary.days, category: selected });
+    if (selectedDay) params.set('day', selectedDay);
+    try {
+      const res = await fetch(API_BASE + '/get_new_events?' + params);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.detail || res.statusText);
+      if (seq !== listSeq) return;
+      renderList(body);
+    } catch (err) {
+      if (seq !== listSeq) return;
+      box.innerHTML = '<div class="list-meta error">Could not load events: ' + esc(err.message) + '</div>';
+    }
+  }
+
+  function renderList(body) {
+    const box = document.getElementById('event-list');
+    const showCat = body.category === 'All';
+    const scope = body.day ? 'added ' + body.day : 'added in the last ' + summary.days + ' days';
+    if (!body.events.length) {
+      box.innerHTML = '<div class="list-meta">No events ' + esc(scope) + '.</div>';
+      return;
+    }
+    const meta = body.events.length < body.total_events
+      ? 'Showing ' + whole(body.events.length) + ' of ' + whole(body.total_events) + ' events ' + scope + ' · newest first, then by volume' + (body.day ? '' : ' · click a bar to list one day')
+      : whole(body.total_events) + ' event' + (body.total_events === 1 ? '' : 's') + ' ' + scope + ' · newest first, then by volume';
+    box.innerHTML = '<div class="list-meta">' + esc(meta) + '</div>' +
+      '<div class="table-wrap"><table class="events"><thead><tr>' +
+      '<th>Date added</th>' + (showCat ? '<th>Category</th>' : '') +
+      '<th>Event</th><th class="num">Volume</th><th class="num">Open interest</th>' +
+      '</tr></thead><tbody>' +
+      body.events.map(e =>
+        '<tr><td class="mono">' + esc(e.date_added) + '</td>' +
+        (showCat ? '<td><span class="tag">' + esc(e.category) + '</span></td>' : '') +
+        '<td class="title">' + esc(e.event_title) + '</td>' +
+        '<td class="num">' + esc(whole(e.event_volume)) + '</td>' +
+        '<td class="num">' + esc(whole(e.open_interest)) + '</td></tr>'
+      ).join('') +
+      '</tbody></table></div>';
+  }
+
+  async function loadSummary() {
+    const seq = ++summarySeq;
+    const days = readDays();
+    document.querySelectorAll('#quick-days .chip').forEach(b => b.classList.toggle('active', Number(b.dataset.days) === days));
+    document.getElementById('results-count').textContent = 'Loading…';
+    if (!summary) {
+      document.getElementById('tiles').innerHTML =
+        '<div class="state-box" style="grid-column:1/-1"><div class="spinner"></div><div class="state-title">LOADING NEW EVENTS</div></div>';
+    }
+    try {
+      const res = await fetch(API_BASE + '/get_new_events_summary?days=' + days);
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.detail || res.statusText);
+      if (seq !== summarySeq) return;
+      summary = body;
+      if (!summary.categories.some(c => c.category === selected)) selected = 'All';
+      if (selectedDay && !summary.dates.includes(selectedDay)) selectedDay = null;
+      const all = summary.categories.find(c => c.category === 'All');
+      document.getElementById('results-count').textContent =
+        whole(all.total) + ' new events · ' + summary.start_date + ' to ' + summary.end_date + ' (ET, completed days) · ' +
+        (summary.categories.length - 1) + ' categories';
+      renderTiles();
+      renderDetail();
+    } catch (err) {
+      if (seq !== summarySeq) return;
+      document.getElementById('results-count').innerHTML = '<span class="error">Could not load data: ' + esc(err.message) + '</span>';
+      if (!summary) {
+        document.getElementById('tiles').innerHTML =
+          '<div class="state-box" style="grid-column:1/-1"><div class="state-title">DATA UNAVAILABLE</div><div class="state-sub">Please try again in a few minutes.</div></div>';
+      }
+    }
+  }
+
+  document.querySelectorAll('#quick-days .chip').forEach(b => b.addEventListener('click', () => {
+    document.getElementById('f-days').value = b.dataset.days;
+    loadSummary();
+  }));
+  document.getElementById('btn-apply').addEventListener('click', loadSummary);
+  document.getElementById('f-days').addEventListener('keydown', e => { if (e.key === 'Enter') loadSummary(); });
+
+  loadSummary();
+</script>
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">New events are counted on the earlier of the day they were listed and the day they first traded. Volume and open interest are as reported by each exchange. Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+</div>
+</body>
+</html>
