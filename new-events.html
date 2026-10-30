@@ -85,6 +85,11 @@
   table.events .num { text-align:right; font-family:var(--mono); font-size:11px; white-space:nowrap; }
   table.events .mono { font-family:var(--mono); font-size:11px; white-space:nowrap; color:var(--text3); }
   table.events .title { color:var(--text); min-width:220px; }
+  table.events .nw { white-space:nowrap; }
+  table.events th.num { font-size:9px; }
+  table.events th.sortable { cursor:pointer; user-select:none; transition:color 0.15s; }
+  table.events th.sortable:hover { color:var(--text); }
+  table.events th.sorted { color:var(--accent); }
   .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); white-space:nowrap; }
   .error { color:var(--red); }
 
@@ -141,7 +146,7 @@
       </div>
       <div>
         <div class="header-title">NEW EVENT TRACKING</div>
-        <div class="header-sub">NEWLY LISTED EVENTS ACROSS ALL TRACKED EXCHANGES</div>
+        <div class="header-sub">NEWLY LISTED EVENTS</div>
       </div>
     </div>
     <div class="live-badge"><div class="live-dot"></div>DAILY</div>
@@ -184,6 +189,7 @@
   let selected = 'All';        // selected category
   let selectedDay = null;      // day the list is narrowed to, or null for the whole window
   let summarySeq = 0, listSeq = 0;
+  let sortCol = 'date_added', sortDir = 'desc';   // event list sort; kept across tiles and days
   let detailChart = null;
 
   function esc(s) {
@@ -328,6 +334,8 @@
     box.innerHTML = '<div class="list-meta">Loading events…</div>';
     const params = new URLSearchParams({ days: summary.days, category: selected });
     if (selectedDay) params.set('day', selectedDay);
+    params.set('sort', sortCol);
+    params.set('dir', sortDir);
     try {
       const res = await fetch(API_BASE + '/get_new_events?' + params);
       const body = await res.json();
@@ -340,30 +348,57 @@
     }
   }
 
+  // Sorting happens server-side, across every event in the selection, not just the rows shown.
+  const COLUMNS = [
+    { key: 'date_added',    label: 'Date added',    cls: '',    firstDir: 'desc' },
+    { key: 'country',       label: 'Country',       cls: '',    firstDir: 'asc'  },
+    { key: 'category',      label: 'Category',      cls: '',    firstDir: 'asc'  },
+    { key: 'subcategory',   label: 'Subcategory',   cls: '',    firstDir: 'asc'  },
+    { key: 'event_title',   label: 'Event',         cls: '',    firstDir: 'asc'  },
+    { key: 'event_volume',  label: 'Volume',        cls: 'num', firstDir: 'desc' },
+    { key: 'open_interest', label: 'Open interest', cls: 'num', firstDir: 'desc' },
+  ];
+
+  function sortDescription() {
+    if (sortCol === 'date_added' && sortDir === 'desc') return 'newest first, then by volume';
+    const col = COLUMNS.find(c => c.key === sortCol);
+    return 'sorted by ' + col.label.toLowerCase() + (sortDir === 'asc' ? ' (ascending)' : ' (descending)');
+  }
+
   function renderList(body) {
     const box = document.getElementById('event-list');
-    const showCat = body.category === 'All';
     const scope = body.day ? 'added ' + body.day : 'added in the last ' + summary.days + ' days';
     if (!body.events.length) {
       box.innerHTML = '<div class="list-meta">No events ' + esc(scope) + '.</div>';
       return;
     }
     const meta = body.events.length < body.total_events
-      ? 'Showing ' + whole(body.events.length) + ' of ' + whole(body.total_events) + ' events ' + scope + ' · newest first, then by volume' + (body.day ? '' : ' · click a bar to list one day')
-      : whole(body.total_events) + ' event' + (body.total_events === 1 ? '' : 's') + ' ' + scope + ' · newest first, then by volume';
-    box.innerHTML = '<div class="list-meta">' + esc(meta) + '</div>' +
-      '<div class="table-wrap"><table class="events"><thead><tr>' +
-      '<th>Date added</th>' + (showCat ? '<th>Category</th>' : '') +
-      '<th>Event</th><th class="num">Volume</th><th class="num">Open interest</th>' +
-      '</tr></thead><tbody>' +
+      ? 'Showing ' + whole(body.events.length) + ' of ' + whole(body.total_events) + ' events ' + scope + ' · ' + sortDescription() + (body.day ? '' : ' · click a bar to list one day')
+      : whole(body.total_events) + ' event' + (body.total_events === 1 ? '' : 's') + ' ' + scope + ' · ' + sortDescription();
+    const head = COLUMNS.map(c => {
+      const active = c.key === sortCol;
+      const arrow = active ? (sortDir === 'asc' ? ' ▲' : ' ▼') : '';
+      return '<th class="sortable' + (c.cls ? ' ' + c.cls : '') + (active ? ' sorted' : '') + '" data-sort="' + c.key + '"' +
+        ' aria-sort="' + (active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none') + '">' + esc(c.label) + arrow + '</th>';
+    }).join('');
+    box.innerHTML = '<div class="list-meta">' + esc(meta) + ' · click a column header to sort</div>' +
+      '<div class="table-wrap"><table class="events"><thead><tr>' + head + '</tr></thead><tbody>' +
       body.events.map(e =>
         '<tr><td class="mono">' + esc(e.date_added) + '</td>' +
-        (showCat ? '<td><span class="tag">' + esc(e.category) + '</span></td>' : '') +
+        '<td class="mono">' + esc(e.country || '–') + '</td>' +
+        '<td><span class="tag">' + esc(e.category) + '</span></td>' +
+        '<td class="nw">' + esc(e.subcategory || '–') + '</td>' +
         '<td class="title">' + esc(e.event_title) + '</td>' +
         '<td class="num">' + esc(whole(e.event_volume)) + '</td>' +
         '<td class="num">' + esc(whole(e.open_interest)) + '</td></tr>'
       ).join('') +
       '</tbody></table></div>';
+    box.querySelectorAll('th.sortable').forEach(th => th.addEventListener('click', () => {
+      const col = COLUMNS.find(c => c.key === th.dataset.sort);
+      if (sortCol === col.key) sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+      else { sortCol = col.key; sortDir = col.firstDir; }
+      loadList();
+    }));
   }
 
   async function loadSummary() {
@@ -408,7 +443,7 @@
 
   loadSummary();
 </script>
-<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">New events are counted on the earlier of the day they were listed and the day they first traded. Volume and open interest are as reported by each exchange. Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">New events are counted on the earlier of the day they were listed and the day they first traded. Volume and open interest are as reported. Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
 <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
 </div>
 </body>
