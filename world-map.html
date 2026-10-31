@@ -325,13 +325,11 @@
 
 </div>
 <script>
-  const API_BASE        = 'https://api.dataopenmind.com/public';
+  const API_BASE        = 'https://api.dataopenmind.com/public/cons';
   const COUNTRY_MAP_URL = API_BASE + '/get_country_map';
   const CATEGORY_MAP_URL= API_BASE + '/get_category_map';
   const DASHBOARD_URL   = API_BASE + '/get_events_dashboard_data';
   const OMD_PRICES      = API_BASE + '/get_daily_prices';
-  const KALSHI_TRADES   = API_BASE + '/get_kalshi_trades';
-  const KALSHI_ORDERBOOK= API_BASE + '/get_kalshi_orderbook';
   const GET_MARKETS     = API_BASE + '/get_markets';
   const OMD_FORECAST    = API_BASE + '/get_omd_forecast';
 
@@ -849,7 +847,6 @@
 
   function buildMarketCard(m) {
     const wrapper = document.createElement('div');
-    const isKalshi     = (m.exchange || '').toLowerCase() === 'kalshi';
     const price    = m.top_market_last_price;
     const pClass   = probClass(price);
     const pct      = price != null ? Math.round(price * 100) + '%' : 'N/A';
@@ -859,7 +856,6 @@
     const dataAttrs = m.top_market_id
       ? `data-market-id="${m.top_market_id}"
          ${m.event_id ? `data-event-id="${m.event_id}"` : ''}
-         data-exchange="${m.exchange || ''}"
          data-source="omd"
          onclick="showPriceChart(this)"`
       : '';
@@ -874,7 +870,6 @@
         <div class="market-meta">
           ${m.subcategory ? `<span class="tag">${escapeHTML(m.subcategory)}</span>` : ''}
           ${m.country     ? `<span class="tag">${escapeHTML(m.country)}</span>`     : ''}
-          ${m.exchange    ? `<span class="tag">${escapeHTML(m.exchange.toUpperCase())}</span>` : ''}
           <span class="vol">Vol: ${fmtVol(m.event_volume)}</span>
         </div>
       </div>`;
@@ -885,16 +880,9 @@
       const actions = document.createElement('div');
       actions.className = 'market-actions';
       actions.innerHTML += `<button class="action-btn" onclick="showPriceChart(this.closest('.market-card').querySelector('.clickable-prob'))">📈 Price</button>`;
-      if (isKalshi && marketId) {
-        const ticker = marketId.replace(/^ka_/i, '');
-        actions.innerHTML += `<button class="action-btn" onclick="showKalshiTradesPanel('${marketId}','${ticker}',this)">🔄 Trades</button>`;
-        actions.innerHTML += `<button class="action-btn" onclick="showKalshiOrderbookPanel('${marketId}','${ticker}',this)">📖 Order Book</button>`;
-      }
      if(m.event_id) {actions.innerHTML += '<button class="action-btn" onclick="showMarketsPanel(\'' + marketId + '\',\'' + m.event_id + '\',this)">&#9776; Markets</button>';} 
-     if (isKalshi && m.event_id && m.is_forecast_market) {
-       const rawEventId = m.event_id.replace(/^ka_/i, '');
-       const exchName = m.exchange || '';
-       actions.innerHTML += '<button class="action-btn" onclick="showForecastPanel(\'' + marketId + '\',\'' + exchName + '\',\'' + rawEventId + '\',this)">📈 Forecast</button>';
+     if (m.event_id && m.is_forecast_market) {
+       actions.innerHTML += '<button class="action-btn" onclick="showForecastPanel(\'' + marketId + '\',\'\',\'' + m.event_id + '\',this)">📈 Forecast</button>';
      }
      card.appendChild(actions);
     }
@@ -962,7 +950,6 @@
   async function showPriceChart(el) {
     if (!el) return;
     const marketId = el.dataset.marketId;
-    const exchange = el.dataset.exchange || '';
     const card     = el.closest('.market-card');
     const title    = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
     const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
@@ -1030,118 +1017,7 @@
     });
   }
 
-  // ── 🔄 KALSHI TRADES TABLE ───────────────────────────
-  async function showKalshiTradesPanel(marketId, ticker, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'trades');
 
-    togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Recent trades · last 7 days', 'LOADING', 'var(--text2)', subtitle);
-      try {
-        const res    = await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
-        const json   = await res.json();
-        const trades = (json.trades||[]).filter(t=>(t.amount_usd||0)>=1000).slice(0,20);
-
-        safeBadge(`${pid}-badge`, `${trades.length} TRADES`, 'var(--text2)', 'var(--bg4)', '1px solid var(--border2)');
-
-        const bodyEl = document.getElementById(`${pid}-body`);
-        if (!bodyEl) return;
-        if (!trades.length) { bodyEl.innerHTML='<div class="panel-loading">No trades found in the last 7 days.</div>'; return; }
-
-        const rows = trades.map(t => {
-          const side      = t.side==='BUY' ? '<span class="buy">BUY</span>' : '<span class="sell">SELL</span>';
-          const outcome   = t.is_yes_side  ? '<span class="yes">YES</span>' : '<span class="no">NO</span>';
-          const price     = t.price!=null ? (t.price*100).toFixed(1)+'%' : 'N/A';
-          const amount    = fmtVol(t.amount_usd);
-          const time      = t.timestamp ? fmtTime(t.timestamp) : 'N/A';
-          const contracts = t.shares!=null ? t.shares.toLocaleString()+' cts' : 'N/A';
-          return `<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${contracts}</td></tr>`;
-        }).join('');
-
-        bodyEl.innerHTML = `
-          <div style="overflow-x:auto;margin-top:4px;">
-            <table class="trades-table">
-              <thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>~Amount</th><th>Contracts</th></tr></thead>
-              <tbody>${rows}</tbody>
-            </table>
-          </div>`;
-      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load trades data.</div>'); console.error(e); }
-    });
-  }
-
-  // ── 📖 KALSHI ORDER BOOK ─────────────────────────────
-  async function showKalshiOrderbookPanel(marketId, ticker, btn) {
-    const card  = btn.closest('.market-card');
-    const title = card?.querySelector('.market-title')?.childNodes[0]?.textContent?.trim() || 'Market';
-    const subtitle = card?.querySelector('.market-subtitle')?.childNodes[0]?.textContent?.trim() || '';
-    const pid   = panelId(marketId, 'orderbook');
-
-    togglePanel(card, pid, async (panel) => {
-      panelShell(panel, title, 'Current order book depth', 'LOADING', 'var(--amber)', subtitle);
-      try {
-        const res  = await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
-        const json = await res.json();
-        const snap = (json.snapshots||[])[0];
-
-        if (!snap) { safeHTML(`${pid}-body`, '<div class="panel-loading">No orderbook data available.</div>'); return; }
-
-        const bids = (snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
-        const asks = (snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
-
-        safeBadge(`${pid}-badge`, 'LIVE', 'var(--amber)', 'var(--amber-dim)', '1px solid rgba(240,165,0,0.25)');
-
-        const bidPrices = bids.map(b=>(b.price*100).toFixed(1)+'%');
-        const askPrices = asks.map(a=>(a.price*100).toFixed(1)+'%');
-        const allPriceLabels = [...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
-
-        const combinedData = allPriceLabels.map(p => {
-          const bid = bids.find(b=>(b.price*100).toFixed(1)+'%'===p);
-          const ask = asks.find(a=>(a.price*100).toFixed(1)+'%'===p);
-          return bid ? bid.size : (ask ? ask.size : 0);
-        });
-        const barColors   = allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.7)' : 'rgba(255,77,109,0.7)');
-        const borderColors= allPriceLabels.map(p => bids.find(b=>(b.price*100).toFixed(1)+'%'===p) ? 'rgba(0,229,160,0.9)' : 'rgba(255,77,109,0.9)');
-
-        const bodyEl = document.getElementById(`${pid}-body`);
-        if (!bodyEl) return;
-        bodyEl.innerHTML = `
-          <div style="display:flex;gap:14px;margin-bottom:6px;">
-            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(0,229,160,0.7);border-radius:2px;flex-shrink:0;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Bids</span></div>
-            <div style="display:flex;align-items:center;gap:5px;"><div style="width:10px;height:10px;background:rgba(255,77,109,0.7);border-radius:2px;flex-shrink:0;"></div><span style="font-family:var(--mono);font-size:10px;color:var(--text2);letter-spacing:0.04em;">Asks</span></div>
-          </div>
-          <div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div>
-          <div class="panel-stats" id="${pid}-stats"></div>`;
-
-        if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
-        const canvasEl = document.getElementById(`${pid}-canvas`);
-        if (!canvasEl) return;
-        chartInstances[pid] = new Chart(canvasEl, {
-          type:'bar',
-          data:{ labels:allPriceLabels, datasets:[{ data:combinedData, backgroundColor:barColors, borderColor:borderColors, borderWidth:0, barPercentage:0.8, categoryPercentage:0.9 }] },
-          options:{ responsive:true, maintainAspectRatio:false, animation:{duration:300},
-            plugins:{ legend:{display:false},
-              tooltip:{ backgroundColor:'#161c24', borderColor:'rgba(255,255,255,0.1)', borderWidth:1, titleColor:'#8a9099', bodyColor:'#f0f2f5',
-                titleFont:{family:"'IBM Plex Mono',monospace",size:10}, bodyFont:{family:"'IBM Plex Mono',monospace",size:11},
-                callbacks:{ label:(i)=>{ const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)'; return ` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} contracts`; } } } },
-            scales:{
-              x:{ offset:true, grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0}, border:{color:'rgba(255,255,255,0.07)'} },
-              y:{ grid:{color:'rgba(255,255,255,0.04)'}, ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}}, border:{color:'rgba(255,255,255,0.07)'} } } }
-        });
-
-        const bestBid = snap.best_bid ? (snap.best_bid*100).toFixed(1)+'%' : (bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A');
-        const bestAsk = snap.best_ask ? (snap.best_ask*100).toFixed(1)+'%' : (asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A');
-        const spread  = bids.length && asks.length ? ((asks[0].price-bids[0].price)*100).toFixed(1)+'%' : 'N/A';
-
-        safeHTML(`${pid}-stats`, `
-          <div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div>
-          <div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div>
-          <div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div>
-          <div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`);
-      } catch(e) { safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load orderbook data.</div>'); console.error(e); }
-    });
-  }
 
 async function showMarketsPanel(marketId, eventId, btn) {
   const card  = btn.closest('.market-card');
@@ -1208,9 +1084,7 @@ async function showMarketsPanel(marketId, eventId, btn) {
 
     try {
       const now      = Math.floor(Date.now() / 1000);
-      // Kalshi only -- Polymarket forecasts removed for licensing. Kalshi supports 90 days.
-      const start    = now - (90 * 86400);
-      const url      = `${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`;
+            const url = `${API_BASE}/get_omd_forecast?event_id=${encodeURIComponent(rawEventId)}`;
 
       const res  = await fetch(url);
       if (!res.ok) throw new Error(`Forecast API error: ${res.status}`);
@@ -1223,11 +1097,9 @@ async function showMarketsPanel(marketId, eventId, btn) {
         return;
       }
 
-      // Normalize values:
-      // Kalshi returns raw decimal (0.21 = 0.21%)
-      // Displayed as-is since it is already in the right scale for the market
+      // Forecast values are in the metric's own units (e.g. %, jobs); shown as-is.
       const pts = raw
-        .filter(d => d.p !== null && d.p !== undefined && Math.abs(d.p) < 1000)
+        .filter(d => d.p !== null && d.p !== undefined)
         .sort((a, b) => a.t - b.t);
 
       if (!pts.length) {
@@ -1254,7 +1126,7 @@ async function showMarketsPanel(marketId, eventId, btn) {
       if (!bodyEl) return;
       bodyEl.innerHTML = `<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
 
-      safeBadge(`${pid}-badge`, exchange.toUpperCase(), 'var(--accent)', 'var(--accent-dim)', '1px solid rgba(0,229,160,0.25)');
+      safeBadge(`${pid}-badge`, 'OMD FORECAST', 'var(--accent)', 'var(--accent-dim)', '1px solid rgba(0,229,160,0.25)');
 
       if (chartInstances[pid]) { chartInstances[pid].destroy(); delete chartInstances[pid]; }
       const canvasEl = document.getElementById(`${pid}-canvas`);
@@ -1323,10 +1195,9 @@ async function showMarketsPanel(marketId, eventId, btn) {
 
       safeHTML(`${pid}-stats`, `
         <div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div>
-        <div class="stat"><div class="stat-label">90D Change</div><div class="stat-value ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '+' : ''}${fmt(change)}</div></div>
-        <div class="stat"><div class="stat-label">90D High</div><div class="stat-value">${fmt(maxVal)}</div></div>
-        <div class="stat"><div class="stat-label">90D Low</div><div class="stat-value">${fmt(minVal)}</div></div>
-        <div class="stat" style="margin-left:auto;"><div class="stat-label">Source</div><div class="stat-value" style="font-size:11px;">${exchange.toUpperCase()}</div></div>`);
+        <div class="stat"><div class="stat-label">Change</div><div class="stat-value ${change >= 0 ? 'up' : 'down'}">${change >= 0 ? '+' : ''}${fmt(change)}</div></div>
+        <div class="stat"><div class="stat-label">High</div><div class="stat-value">${fmt(maxVal)}</div></div>
+        <div class="stat"><div class="stat-label">Low</div><div class="stat-value">${fmt(minVal)}</div></div>`);
 
     } catch(e) {
       safeHTML(`${pid}-body`, '<div class="panel-loading">Failed to load forecast data.</div>');

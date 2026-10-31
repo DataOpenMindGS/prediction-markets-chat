@@ -234,7 +234,7 @@
     </div>
     <div>
       <div class="header-title">PREDICTION MARKETS — MARKET CAP LEADERBOARD</div>
-      <div class="header-sub">RANKED BY OPEN INTEREST · KALSHI · FORECASTEX</div>
+      <div class="header-sub">CONSENSUS EVENTS RANKED BY OPEN INTEREST</div>
     </div>
   </div>
   <div class="live-badge"><div class="live-dot"></div>LIVE</div>
@@ -335,10 +335,8 @@
 <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
 
 <script>
-  const API_BASE        = 'https://api.dataopenmind.com/public';
+  const API_BASE        = 'https://api.dataopenmind.com/public/cons';
   const OMD_PRICES      = `${API_BASE}/get_daily_prices`;
-  const KALSHI_TRADES   = `${API_BASE}/get_kalshi_trades`;
-  const KALSHI_ORDERBOOK= `${API_BASE}/get_kalshi_orderbook`;
   const EVT_OI          = `${API_BASE}/get_event_openinterest`;
   const GET_MARKETS     = `${API_BASE}/get_markets`;
 
@@ -602,13 +600,12 @@
     activeMarket = m;
     chartInstances = {}; // reset charts for new modal context
 
-    const isKalshi     = (m.exchange||'').toLowerCase()==='kalshi';
     const marketId     = m.top_market_id;
     const price        = m.top_market_last_price;
     const subtitle     = m.top_market_subtitle && m.top_market_subtitle !== 'Not available' ? m.top_market_subtitle : null;
 
     document.getElementById('modal-title').textContent = m.event_title || '—';
-    const subtitleParts = [m.exchange, m.category].filter(Boolean).join(' · ');
+    const subtitleParts = [m.category].filter(Boolean).join(' · ');
     const subtitleEl = document.getElementById('modal-subtitle');
     subtitleEl.innerHTML = '';
     if (subtitleParts) {
@@ -664,7 +661,7 @@
     actionsEl.innerHTML = '';
     if(marketId) {
       const dataAttrs = `data-market-id="${marketId}"
-        data-exchange="${m.exchange||''}" data-source="omd"
+        data-source="omd"
         ${m.event_id?`data-event-id="${m.event_id}"`:''}`;
 
       addModalBtn(actionsEl, '📈 Price', `showPriceChart(document.getElementById('modal-price-trigger'))`);
@@ -672,23 +669,16 @@
       const trigger = document.createElement('span');
       trigger.id = 'modal-price-trigger';
       trigger.setAttribute('data-market-id', marketId);
-      trigger.setAttribute('data-exchange', m.exchange||'');
       if(m.event_id) trigger.setAttribute('data-event-id', m.event_id);
       trigger.style.display='none';
       actionsEl.appendChild(trigger);
 
-      if(isKalshi && marketId) {
-        const ticker = marketId.replace(/^ka_/i,'');
-        addModalBtn(actionsEl, '🔄 Trades',    `showKalshiTradesPanel('${marketId}','${ticker}',null)`);
-        addModalBtn(actionsEl, '📖 Order Book',`showKalshiOrderbookPanel('${marketId}','${ticker}',null)`);
-      }
       if(m.event_id) {
         addModalBtn(actionsEl, '📐 Event OI',  `showEventOIPanel('${marketId}','${m.event_id}',null)`, 'oi-btn');
         addModalBtn(actionsEl, '☰ Markets',    `showMarketsPanel('${marketId}','${m.event_id}',null)`);
       }
-      if(isKalshi && m.event_id && m.is_forecast_market) {
-        const rawId = m.event_id.replace(/^ka_/i,'');
-        addModalBtn(actionsEl, '📈 Forecast',  `showForecastPanel('${marketId}','${m.exchange||''}','${rawId}',null)`);
+      if(m.event_id && m.is_forecast_market) {
+        addModalBtn(actionsEl, '📈 Forecast',  `showForecastPanel('${marketId}','','${m.event_id}',null)`);
       }
     }
 
@@ -833,57 +823,7 @@
     });
   }
 
-  // ── 📖 KALSHI ORDER BOOK ───────────────────────────────
-  async function showKalshiOrderbookPanel(marketId, ticker, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'orderbook');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'Current order book depth','LOADING','var(--amber)',subtitle);
-      try {
-        const res=await fetch(`${KALSHI_ORDERBOOK}?ticker=${encodeURIComponent(ticker)}`);
-        const json=await res.json();
-        const snap=(json.snapshots||[])[0];
-        if(!snap){safeHTML(`${pid}-body`,'<div class="panel-loading">No orderbook data available.</div>');return;}
-        const bids=(snap.bids||[]).sort((a,b)=>b.price-a.price).slice(0,15);
-        const asks=(snap.asks||[]).sort((a,b)=>a.price-b.price).slice(0,15);
-        safeBadge(`${pid}-badge`,'LIVE','var(--amber)','var(--amber-dim)','1px solid rgba(240,165,0,0.25)');
-        const bidPrices=bids.map(b=>(b.price*100).toFixed(1)+'%');
-        const askPrices=asks.map(a=>(a.price*100).toFixed(1)+'%');
-        const allPriceLabels=[...new Set([...bidPrices,...askPrices])].sort((a,b)=>parseFloat(a)-parseFloat(b));
-        const combinedData=allPriceLabels.map(p=>{const bid=bids.find(b=>(b.price*100).toFixed(1)+'%'===p);const ask=asks.find(a=>(a.price*100).toFixed(1)+'%'===p);return bid?bid.size:(ask?ask.size:0);});
-        const barColors=allPriceLabels.map(p=>bids.find(b=>(b.price*100).toFixed(1)+'%'===p)?'rgba(0,229,160,0.7)':'rgba(255,77,109,0.7)');
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        bodyEl.innerHTML=`<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-        if(chartInstances[pid]){chartInstances[pid].destroy();delete chartInstances[pid];}
-        const canvasEl=document.getElementById(`${pid}-canvas`);
-        if(!canvasEl) return;
-        chartInstances[pid]=new Chart(canvasEl,{type:'bar',data:{labels:allPriceLabels,datasets:[{data:combinedData,backgroundColor:barColors,borderWidth:0,barPercentage:0.8,categoryPercentage:0.9}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},plugins:{legend:{display:false},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:11},callbacks:{label:(i)=>{const isBid=barColors[i.dataIndex]==='rgba(0,229,160,0.7)';return` ${isBid?'Bid':'Ask'}: ${i.raw.toLocaleString()} contracts`;}}}},scales:{x:{offset:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11}},border:{color:'rgba(255,255,255,0.07)'}}}}});
-        const bestBid=snap.best_bid?(snap.best_bid*100).toFixed(1)+'%':(bids.length?(bids[0].price*100).toFixed(1)+'%':'N/A');
-        const bestAsk=snap.best_ask?(snap.best_ask*100).toFixed(1)+'%':(asks.length?(asks[0].price*100).toFixed(1)+'%':'N/A');
-        const spread=bids.length&&asks.length?((asks[0].price-bids[0].price)*100).toFixed(1)+'%':'N/A';
-        safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Best Bid</div><div class="stat-value up">${bestBid}</div></div><div class="stat"><div class="stat-label">Best Ask</div><div class="stat-value down">${bestAsk}</div></div><div class="stat"><div class="stat-label">Spread</div><div class="stat-value">${spread}</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">Snapshot</div><div class="stat-value" style="font-size:10px;">${snap.timestamp?fmtTime(snap.timestamp/1000):'Recent'}</div></div>`);
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load orderbook data.</div>');console.error(e);}
-    });
-  }
 
-  // ── 🔄 KALSHI TRADES ────────────────────────────────────
-  async function showKalshiTradesPanel(marketId, ticker, btn) {
-    const title=getModalTitle(), subtitle=getModalSubtitle(), pid=panelId(marketId,'trades');
-    togglePanel(null, pid, async (panel) => {
-      panelShell(panel,title,'Recent trades · last 7 days','LOADING','var(--text2)',subtitle);
-      try {
-        const res=await fetch(`${KALSHI_TRADES}?ticker=${encodeURIComponent(ticker)}&days=7&min_count=1000`);
-        const json=await res.json();
-        const trades=(json.trades||[]).filter(t=>(t.amount_usd||0)>=1000).slice(0,20);
-        safeBadge(`${pid}-badge`,`${trades.length} TRADES`,'var(--text2)','var(--bg4)','1px solid var(--border2)');
-        const bodyEl=document.getElementById(`${pid}-body`);
-        if(!bodyEl) return;
-        if(!trades.length){bodyEl.innerHTML='<div class="panel-loading">No trades found in the last 7 days.</div>';return;}
-        const rows=trades.map(t=>{const side=t.side==='BUY'?'<span class="buy">BUY</span>':'<span class="sell">SELL</span>';const outcome=t.is_yes_side?'<span class="yes">YES</span>':'<span class="no">NO</span>';const price=t.price!=null?(t.price*100).toFixed(1)+'%':'N/A';const amount=fmtVol(t.amount_usd);const time=t.timestamp?fmtTime(t.timestamp):'N/A';const contracts=t.shares!=null?t.shares.toLocaleString()+' cts':'N/A';return`<tr><td>${time}</td><td>${side}</td><td>${outcome}</td><td>${price}</td><td>${amount}</td><td style="color:var(--text3)">${contracts}</td></tr>`;}).join('');
-        bodyEl.innerHTML=`<div style="overflow-x:auto;margin-top:4px;"><table class="trades-table"><thead><tr><th>Time</th><th>Side</th><th>Outcome</th><th>Price</th><th>~Amount</th><th>Contracts</th></tr></thead><tbody>${rows}</tbody></table></div>`;
-      } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load trades data.</div>');console.error(e);}
-    });
-  }
 
   // ── ☰ MARKETS PANEL ────────────────────────────────────
   async function showMarketsPanel(marketId, eventId, btn) {
@@ -912,15 +852,13 @@
       panelShell(panel,title,'Market forecast history','LOADING','var(--accent)');
       try {
         const now=Math.floor(Date.now()/1000);
-        // Kalshi only -- Polymarket forecasts removed for licensing. Kalshi supports 90 days.
-        const start=now-(90*86400);
-        const url=`${API_BASE}/get_kalshi_forecast?event_id=${encodeURIComponent(rawEventId)}&start_ts=${start}&end_ts=${now}&period_interval=60`;
+                const url=`${API_BASE}/get_omd_forecast?event_id=${encodeURIComponent(rawEventId)}`;
         const res=await fetch(url);
         if(!res.ok) throw new Error(`Forecast API error: ${res.status}`);
         const data=await res.json();
         const raw=data.history||[];
         if(!raw.length){safeHTML(`${pid}-body`,'<div class="panel-loading">No forecast data available.</div>');return;}
-        const pts=raw.filter(d=>d.p!==null&&d.p!==undefined&&Math.abs(d.p)<1000).sort((a,b)=>a.t-b.t);
+        const pts=raw.filter(d=>d.p!==null&&d.p!==undefined).sort((a,b)=>a.t-b.t);
         if(!pts.length){safeHTML(`${pid}-body`,'<div class="panel-loading">No valid forecast data found.</div>');return;}
         const labels=pts.map(d=>{const dt=new Date(d.t*1000);return`${dt.getMonth()+1}/${dt.getDate()}/${String(dt.getFullYear()).slice(2)}`;});
         const values=pts.map(d=>Math.round(d.p*10000)/10000);
@@ -929,12 +867,12 @@
         const bodyEl=document.getElementById(`${pid}-body`);
         if(!bodyEl) return;
         bodyEl.innerHTML=`<div class="panel-wrap"><canvas id="${pid}-canvas"></canvas></div><div class="panel-stats" id="${pid}-stats"></div>`;
-        safeBadge(`${pid}-badge`,exchange.toUpperCase(),'var(--accent)','var(--accent-dim)','1px solid rgba(0,229,160,0.25)');
+        safeBadge(`${pid}-badge`,'OMD FORECAST','var(--accent)','var(--accent-dim)','1px solid rgba(0,229,160,0.25)');
         if(chartInstances[pid]){chartInstances[pid].destroy();delete chartInstances[pid];}
         const canvasEl=document.getElementById(`${pid}-canvas`);
         if(!canvasEl) return;
         chartInstances[pid]=new Chart(canvasEl,{type:'line',data:{labels,datasets:[{data:values,borderColor:'#00e5a0',borderWidth:1.5,pointRadius:0,pointHoverRadius:4,fill:true,backgroundColor:(ctx)=>{const g=ctx.chart.ctx.createLinearGradient(0,0,0,140);g.addColorStop(0,'rgba(0,229,160,0.15)');g.addColorStop(1,'rgba(0,229,160,0)');return g;},tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,animation:{duration:300},interaction:{mode:'index',intersect:false},plugins:{legend:{display:false},tooltip:{backgroundColor:'#161c24',borderColor:'rgba(255,255,255,0.1)',borderWidth:1,titleColor:'#8a9099',bodyColor:'#f0f2f5',titleFont:{family:"'IBM Plex Mono',monospace",size:10},bodyFont:{family:"'IBM Plex Mono',monospace",size:12},callbacks:{label:(i)=>` Forecast: ${fmt(i.raw)}`}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},maxTicksLimit:10,maxRotation:0},border:{color:'rgba(255,255,255,0.07)'}},y:{min:Math.min(...values)-Math.abs(Math.min(...values)*0.02),max:Math.max(...values)+Math.abs(Math.max(...values)*0.02),grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#8a9099',font:{family:"'IBM Plex Mono',monospace",size:11},callback:v=>fmt(v)},border:{color:'rgba(255,255,255,0.07)'}}}}});
-        safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div><div class="stat"><div class="stat-label">Change</div><div class="stat-value ${change>=0?'up':'down'}">${change>=0?'+':''}${fmt(change)}</div></div><div class="stat"><div class="stat-label">High</div><div class="stat-value">${fmt(Math.max(...values))}</div></div><div class="stat"><div class="stat-label">Low</div><div class="stat-value">${fmt(Math.min(...values))}</div></div><div class="stat" style="margin-left:auto;"><div class="stat-label">Source</div><div class="stat-value" style="font-size:11px;">${exchange.toUpperCase()}</div></div>`);
+        safeHTML(`${pid}-stats`,`<div class="stat"><div class="stat-label">Current Forecast</div><div class="stat-value">${fmt(currVal)}</div></div><div class="stat"><div class="stat-label">Change</div><div class="stat-value ${change>=0?'up':'down'}">${change>=0?'+':''}${fmt(change)}</div></div><div class="stat"><div class="stat-label">High</div><div class="stat-value">${fmt(Math.max(...values))}</div></div><div class="stat"><div class="stat-label">Low</div><div class="stat-value">${fmt(Math.min(...values))}</div></div>`);
       } catch(e){safeHTML(`${pid}-body`,'<div class="panel-loading">Failed to load forecast data.</div>');console.error(e);}
     });
   }
