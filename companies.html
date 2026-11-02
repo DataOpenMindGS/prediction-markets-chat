@@ -57,7 +57,7 @@
   .company-accordion.open { border-color:var(--border2); }
   .company-header { display:flex; align-items:center; gap:12px; padding:12px 14px; cursor:pointer; user-select:none; transition:background 0.15s; }
   .company-header:hover { background:rgba(255,255,255,0.02); }
-  .company-logo { width:36px; height:36px; border-radius:8px; flex-shrink:0; object-fit:contain; background:var(--bg3); border:1px solid var(--border); padding:3px; }
+  .company-logo { width:36px; height:36px; border-radius:8px; flex-shrink:0; object-fit:contain; background:#fff; border:1px solid var(--border); padding:3px; }
   .company-logo-placeholder { width:36px; height:36px; border-radius:8px; flex-shrink:0; background:var(--bg3); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; font-weight:500; color:var(--text3); }
   .company-info { flex:1; min-width:0; }
   .company-name { font-size:13px; font-weight:500; color:var(--text); }
@@ -214,6 +214,36 @@
   const API_BASE       = 'https://api.dataopenmind.com/public/cons';
   const OMD_PRICES     = API_BASE + '/get_daily_prices';
   const STOCK_PRICES   = 'https://api.dataopenmind.com/public/get_stock_prices';
+
+  // Company logos from Logo.dev (publishable key; safe in client-side code).
+  // Listed companies are looked up by ticker. Companies with no ticker in the company
+  // map are looked up by website domain below; anything else (e.g. stock indices)
+  // keeps the text badge.
+  const LOGO_DEV_TOKEN = 'pk_BZ1RDk01QqiaoKax8mal4w';
+  const COMPANY_DOMAINS = {
+    'Airtable': 'airtable.com', 'Anduril': 'anduril.com', 'Anthropic': 'anthropic.com',
+    'Appsflyer': 'appsflyer.com', 'Bloomberg LP': 'bloomberg.com', 'Blue Origin': 'blueorigin.com',
+    'Brex': 'brex.com', 'Canva': 'canva.com', 'Chick-fil-A': 'chick-fil-a.com',
+    'Circle Internet Group': 'circle.com', 'Cluely': 'cluely.com', 'CoreWeave': 'coreweave.com',
+    'Databricks': 'databricks.com', 'Deel': 'deel.com', 'DeepSeek': 'deepseek.com',
+    'Discord': 'discord.com', 'Fanduel': 'fanduel.com', 'Figma': 'figma.com',
+    'Genentech': 'gene.com', 'Glean': 'glean.com', 'Juul': 'juul.com', 'Klarna': 'klarna.com',
+    'Kraken': 'kraken.com', 'Letterboxd': 'letterboxd.com', 'Nebius': 'nebius.com',
+    'Neuralink': 'neuralink.com', 'Nutrabolt': 'nutrabolt.com', 'Oli Pop': 'drinkolipop.com',
+    'OpenAI': 'openai.com', 'Oura': 'ouraring.com', 'Patek Philippe SA': 'patek.com',
+    'Perplexity': 'perplexity.ai', 'Ramp': 'ramp.com', 'Red Bull': 'redbull.com',
+    'Rippling': 'rippling.com', 'Ro': 'ro.co', 'Rockstar Games': 'rockstargames.com',
+    'Rolex SA': 'rolex.com', 'Shein': 'shein.com', 'Skims Body': 'skims.com',
+    'Snap Inc': 'snap.com', 'SpaceX': 'spacex.com', 'Starlink': 'starlink.com',
+    'Stripe': 'stripe.com', 'Stubhub': 'stubhub.com', 'Waymo': 'waymo.com',
+    'Whoop': 'whoop.com', 'Wonder Group': 'wonder.com', 'X': 'x.com', 'eToro Group': 'etoro.com',
+  };
+  function companyLogoUrl(name, ticker) {
+    const q = '?token=' + LOGO_DEV_TOKEN + '&size=72&format=png';
+    if(ticker) return 'https://img.logo.dev/ticker/' + encodeURIComponent(ticker) + q;
+    if(COMPANY_DOMAINS[name]) return 'https://img.logo.dev/' + COMPANY_DOMAINS[name] + q;
+    return null;
+  }
   const GET_MARKETS = API_BASE + '/get_markets';
 
   let allMarkets   = [];
@@ -332,7 +362,7 @@
   function buildCompanyAccordion(companyName, group) {
     const co      = companyMap[companyName] || {};
     const ticker  = co.ticker || null;
-    const logoUrl = group.markets[0]?.event_image_url || null;
+    const logoUrl = companyLogoUrl(companyName, ticker);
     const markets = group.markets.sort(function(a,b) { return (b.event_volume||0)-(a.event_volume||0); });
 
     const accordion = document.createElement('div');
@@ -346,6 +376,7 @@
       img.className = 'company-logo';
       img.src = logoUrl;
       img.alt = companyName;
+      img.loading = 'lazy';
       img.onerror = function() {
         this.style.display='none';
         const ph = document.createElement('div');
@@ -615,6 +646,6 @@ async function showMarketsPanel(marketId, eventId, btn) {
   init();
 </script>
 <div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07);">Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
-<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a> &nbsp;·&nbsp; <a href="https://logo.dev" target="_blank" rel="noopener" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Logos provided by Logo.dev</a></div>
 </body>
 </html>
