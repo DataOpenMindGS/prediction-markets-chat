@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perps Flows</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg:#090d12; --bg2:#0f1419; --bg3:#161c24; --bg4:#1d2630;
+    --border:rgba(255,255,255,0.07); --border2:rgba(255,255,255,0.13);
+    --accent:#00e5a0; --accent2:#00b87a; --accent-dim:rgba(0,229,160,0.12);
+    --red:#ff4d6d; --red-dim:rgba(255,77,109,0.12);
+    --amber:#f0a500; --amber-dim:rgba(240,165,0,0.12);
+    --blue:#4da6ff; --blue-dim:rgba(77,166,255,0.12);
+    --purple:#a78bfa; --purple-dim:rgba(167,139,250,0.12);
+    --text:#f0f2f5; --text2:#c8cdd4; --text3:#8a9099;
+    --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --radius:10px;
+  }
+  html,body { min-height:100%; background:var(--bg); color:var(--text); font-family:var(--sans); font-size:14px; line-height:1.6; }
+  #app { display:flex; flex-direction:column; min-height:100vh; }
+  #header { display:flex; align-items:center; justify-content:space-between; padding:11px 16px; background:var(--bg2); border-bottom:1px solid var(--border); flex-shrink:0; position:sticky; top:42px; z-index:100; }
+  .header-left { display:flex; align-items:center; gap:10px; }
+  .logo-box { width:30px; height:30px; background:var(--accent); border-radius:7px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .header-title { font-family:var(--mono); font-size:12px; font-weight:500; letter-spacing:0.08em; color:var(--text); }
+  .header-sub { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.06em; margin-top:1px; }
+  .live-badge { display:flex; align-items:center; gap:5px; font-family:var(--mono); font-size:10px; color:var(--accent2); letter-spacing:0.06em; }
+  .live-dot { width:5px; height:5px; background:var(--accent); border-radius:50%; animation:livepulse 2s ease-in-out infinite; }
+  @keyframes livepulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.3;transform:scale(0.7)} }
+
+  #filter-bar { background:var(--bg2); border-bottom:1px solid var(--border); padding:12px 16px; display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; flex-shrink:0; }
+  .filter-group { display:flex; flex-direction:column; gap:4px; }
+  .filter-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
+  .chips { display:flex; gap:4px; flex-wrap:wrap; }
+  .chip { background:var(--bg3); border:1px solid var(--border2); border-radius:7px; padding:6px 11px; color:var(--text2); font-family:var(--mono); font-size:11px; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+  .chip:hover { border-color:rgba(0,229,160,0.35); color:var(--text); }
+  .chip.active { background:var(--accent-dim); border-color:rgba(0,229,160,0.35); color:var(--accent); }
+
+  #results-bar { display:flex; align-items:center; padding:8px 16px; border-bottom:1px solid var(--border); flex-shrink:0; }
+  #results-count { font-family:var(--mono); font-size:11px; color:var(--text3); letter-spacing:0.04em; }
+  #main { flex:1; padding:16px; display:flex; flex-direction:column; gap:16px; min-width:0; }
+  #detail { display:flex; flex-direction:column; gap:16px; min-width:0; }
+  #detail:empty, #compare:empty { display:none; }
+
+  .state-box { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:60px 20px; gap:12px; text-align:center; }
+  .state-title { font-family:var(--mono); font-size:13px; color:var(--text2); letter-spacing:0.04em; }
+  .state-sub { font-size:12px; color:var(--text3); max-width:360px; line-height:1.6; }
+  .spinner { width:20px; height:20px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+
+  /* Market tiles */
+  #tiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:8px; }
+  .tile { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 12px 8px; cursor:pointer; transition:border-color 0.15s, background 0.15s; text-align:left; color:inherit; font:inherit; display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .tile:hover { border-color:var(--border2); background:rgba(255,255,255,0.015); }
+  .tile.selected { border-color:rgba(0,229,160,0.45); background:var(--accent-dim); }
+  .tile-top { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+  .tile-name { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; text-transform:uppercase; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .tile-total { font-family:var(--mono); font-size:15px; font-weight:500; flex-shrink:0; }
+  .tile svg { display:block; width:100%; height:34px; }
+  .tile-foot { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.04em; display:flex; justify-content:space-between; gap:6px; }
+  .pos { color:var(--accent); } .neg { color:var(--red); }
+  @media (max-width:520px) {
+    #tiles { grid-template-columns:1fr 1fr; }
+    .tile-foot { flex-direction:column; gap:0; }
+    .tile-total { font-size:13px; }
+  }
+
+  /* Panels */
+  .panel { background:var(--bg2); border:1px solid var(--border2); border-radius:var(--radius); padding:14px; animation:fadeUp 0.2s ease; min-width:0; }
+  .panel-header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+  .panel-title { font-family:var(--mono); font-size:12px; color:var(--text); letter-spacing:0.06em; }
+  .panel-sub { font-family:var(--mono); font-size:10px; color:var(--text3); margin-top:2px; letter-spacing:0.03em; }
+  .panel-note { font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .chart-wrap { position:relative; height:220px; }
+  .chart-wrap.short { height:190px; }
+  .grid2 { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:16px; }
+  @media (max-width:860px) { .grid2 { grid-template-columns:1fr; } }
+  .stats { display:flex; gap:18px; flex-wrap:wrap; margin-bottom:10px; }
+  .stat { display:flex; flex-direction:column; gap:1px; }
+  .stat-label { font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; }
+  .stat-value { font-family:var(--mono); font-size:14px; font-weight:500; color:var(--text); }
+  .key { display:inline-flex; align-items:center; gap:5px; margin-left:12px; font-family:var(--mono); font-size:10px; color:var(--text3); }
+  .swatch { width:9px; height:9px; border-radius:2px; display:inline-block; }
+
+  .list-meta { font-family:var(--mono); font-size:10px; color:var(--text3); letter-spacing:0.04em; margin:14px 0 6px; }
+  .table-wrap { overflow-x:auto; border:1px solid var(--border); border-radius:8px; max-height:420px; overflow-y:auto; }
+  table.flows { width:100%; border-collapse:collapse; }
+  table.flows th { position:sticky; top:0; background:var(--bg3); font-family:var(--mono); font-size:9px; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; padding:7px 10px; text-align:left; border-bottom:1px solid var(--border); white-space:nowrap; }
+  table.flows td { font-size:12px; color:var(--text2); padding:7px 10px; border-bottom:1px solid var(--border); }
+  table.flows tr:last-child td { border-bottom:none; }
+  table.flows tr:hover td { background:rgba(255,255,255,0.015); }
+  table.flows .num { text-align:right; font-family:var(--mono); font-size:11px; white-space:nowrap; }
+  table.flows th.num { text-align:right; }
+  table.flows .mono { font-family:var(--mono); font-size:11px; white-space:nowrap; color:var(--text3); }
+  .tag { font-family:var(--mono); font-size:9px; letter-spacing:0.07em; padding:2px 7px; border-radius:4px; background:var(--bg4); color:var(--text2); border:1px solid var(--border); white-space:nowrap; }
+  .error { color:var(--red); }
+
+  /* ── Site Nav ── */
+  #site-nav { display:flex; align-items:center; justify-content:space-between; padding:0 16px; height:42px; background:var(--bg2); border-bottom:1px solid rgba(255,255,255,0.1); flex-shrink:0; position:sticky; top:0; z-index:200; }
+  .site-nav-left { display:flex; align-items:center; gap:10px; min-width:0; }
+  .site-nav-logo { width:24px; height:24px; background:var(--accent); border-radius:5px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .site-nav-brand { font-family:var(--mono); font-size:11px; font-weight:500; letter-spacing:0.1em; color:var(--text); white-space:nowrap; }
+  .site-nav-divider { width:1px; height:16px; background:var(--border2); margin:0 6px; }
+  .site-nav-links { display:flex; align-items:center; gap:2px; overflow-x:auto; }
+  .site-nav-links a { font-family:var(--mono); font-size:10px; letter-spacing:0.07em; color:var(--text3); text-decoration:none; padding:4px 9px; border-radius:5px; border:1px solid transparent; transition:color 0.15s,background 0.15s,border-color 0.15s; white-space:nowrap; }
+  .site-nav-links a:hover { color:var(--accent); background:var(--accent-dim); }
+  .site-nav-links a.active { color:var(--accent); background:var(--accent-dim); border-color:rgba(0,229,160,0.22); }
+  .site-nav-right { display:flex; align-items:center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<div id="site-nav">
+  <div class="site-nav-left">
+    <div class="site-nav-logo">
+      <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+        <polyline points="1,12 5,5 9,9 13,4" stroke="#090d12" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="13" cy="4" r="1.8" fill="#090d12"/>
+      </svg>
+    </div>
+    <div class="site-nav-brand">PREDICTION MARKETS DATA</div>
+    <div class="site-nav-divider"></div>
+    <div class="site-nav-links">
+        <a href="index.html">HOME</a>
+        <a href="explorer.html">EXPLORER</a>
+        <a href="text-search.html">TEXT SEARCH</a>
+        <a href="ai-search.html">AI SEARCH</a>
+        <a href="world-map.html">WORLD MAP</a>
+        <a href="economic-stats.html">ECONOMIC STATS</a>
+        <a href="companies.html">COMPANY MARKETS</a>
+        <a href="new-events.html">NEW EVENTS</a>
+        <a href="flows.html" class="active">FLOWS</a>
+        <a href="market-cap.html">MARKET CAP</a>
+        <a href="analysis.html">ANALYSIS</a>
+      </div>
+  </div>
+  <div class="site-nav-right"></div>
+</div>
+
+  <div id="header">
+    <div class="header-left">
+      <div class="logo-box">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <rect x="1.5" y="3" width="2.6" height="5" rx="0.8" fill="#090d12"/>
+          <rect x="6.7" y="1.5" width="2.6" height="6.5" rx="0.8" fill="#090d12"/>
+          <rect x="6.7" y="8.6" width="2.6" height="3.4" rx="0.8" fill="#090d12" opacity="0.55"/>
+          <rect x="11.9" y="8.6" width="2.6" height="5.9" rx="0.8" fill="#090d12" opacity="0.55"/>
+          <line x1="0.5" y1="8.3" x2="15.5" y2="8.3" stroke="#090d12" stroke-width="0.9"/>
+        </svg>
+      </div>
+      <div>
+        <div class="header-title">PERPS FLOWS</div>
+        <div class="header-sub">TAKER BUYING &amp; SELLING PRESSURE IN PERPETUAL FUTURES</div>
+      </div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>DAILY</div>
+  </div>
+
+  <div id="filter-bar">
+    <div class="filter-group">
+      <div class="filter-label">Daily history</div>
+      <div class="chips" id="quick-days">
+        <button class="chip" data-days="30">30D</button>
+        <button class="chip" data-days="90">90D</button>
+        <button class="chip" data-days="180">180D</button>
+        <button class="chip" data-days="365">1Y</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="results-bar">
+    <div id="results-count">Loading…</div>
+  </div>
+
+  <div id="main">
+    <div id="tiles"></div>
+    <div id="detail"></div>
+    <div id="compare"></div>
+  </div>
+
+<script>
+  const API_BASE = 'https://api.dataopenmind.com/public/perps_flow';
+  const DEFAULT_DAYS = 90;
+  const HOURLY_DAYS = 30;              // hourly pattern window (the public API's maximum)
+  const CASH_START = 9, CASH_END = 15; // US cash session hours (ET), highlighted on the hourly charts
+  const VENUE_COLORS = ['#4da6ff', '#a78bfa', '#f0a500'];
+  const MONO = "'IBM Plex Mono',monospace";
+
+  let markets = [];      // /get_markets
+  let daily = [];        // /get_daily rows for the window
+  let hourly = [];       // /get_hourly rows, last HOURLY_DAYS days
+  let days = DEFAULT_DAYS;
+  let selected = null;   // selected perp_id
+  let loadSeq = 0;
+  let charts = [];
+
+  // ---- formatting -------------------------------------------------------------------
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+  function whole(n) { return n == null ? '–' : Math.round(n).toLocaleString('en-US'); }
+  function usd(v) {
+    if (v == null) return '–';
+    const a = Math.abs(v);
+    let s;
+    if (a >= 1e9) s = (a / 1e9).toFixed(2) + 'B';
+    else if (a >= 1e6) s = (a / 1e6).toFixed(2) + 'M';
+    else if (a >= 1e3) s = (a / 1e3).toFixed(1) + 'K';
+    else s = a.toFixed(0);
+    return (v < 0 ? '−$' : '$') + s;
+  }
+  function usdSigned(v) { return v == null ? '–' : (v > 0 ? '+' : '') + usd(v); }
+  function pct(v, d) { return v == null ? '–' : v.toFixed(d == null ? 1 : d) + '%'; }
+  function pctSigned(v, d) { return v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d == null ? 1 : d) + '%'; }
+  function signClass(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : ''; }
+  function shortDate(iso) { const [, m, d] = iso.split('-'); return Number(m) + '/' + Number(d); }
+  function dow(iso) { return new Date(iso + 'T12:00:00Z').getUTCDay(); }
+  function dowName(iso) { return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][dow(iso)]; }
+  function marketName(m) { return m.label + ' · ' + m.venue; }
+  function venueColor(venue) {
+    const venues = [...new Set(markets.map(m => m.venue))].sort();
+    return VENUE_COLORS[Math.max(0, venues.indexOf(venue)) % VENUE_COLORS.length];
+  }
+
+  // ---- data shaping -------------------------------------------------------------------
+  function rowsFor(perpId) { return daily.filter(r => r.perp_id === perpId); }
+
+  // Daily rows plus the derived fields the charts and table use. OI change is against the
+  // market's previous row (the previous day it traded).
+  function enriched(perpId) {
+    const rows = rowsFor(perpId);
+    return rows.map((r, i) => {
+      const prev = i > 0 ? rows[i - 1] : null;
+      const accounts = r.long_accounts != null && r.short_accounts != null && r.long_accounts + r.short_accounts > 0
+        ? 100 * r.long_accounts / (r.long_accounts + r.short_accounts) : null;
+      return Object.assign({}, r, {
+        net_pct: r.dollar_volume ? 100 * r.net_taker_dollar_volume / r.dollar_volume : null,
+        buy_share: r.dollar_volume ? 100 * r.taker_buy_dollar_volume / r.dollar_volume : null,
+        oi_chg: prev && prev.open_interest_usd != null && r.open_interest_usd != null ? r.open_interest_usd - prev.open_interest_usd : null,
+        accounts_long: accounts,
+      });
+    });
+  }
+
+  function summaryFor(perpId) {
+    const rows = rowsFor(perpId);
+    const notional = rows.reduce((s, r) => s + r.dollar_volume, 0);
+    const net = rows.reduce((s, r) => s + r.net_taker_dollar_volume, 0);
+    return {
+      days: rows.length, notional, net,
+      net_pct: notional ? 100 * net / notional : null,
+      buy_days: rows.filter(r => r.net_taker_dollar_volume > 0).length,
+      last: rows.length ? rows[rows.length - 1] : null,
+    };
+  }
+
+  // Weekday averages per ET hour over the days the market traded in the hourly window.
+  function hourlyPattern(perpId) {
+    const rows = hourly.filter(r => r.perp_id === perpId && dow(r.trade_date_et) >= 1 && dow(r.trade_date_et) <= 5);
+    const tradeDays = new Set(rows.map(r => r.trade_date_et)).size;
+    const hours = Array.from({length: 24}, (_, h) => ({ hour: h, notional: 0, net: 0, buy_hours: 0, hours: 0 }));
+    rows.forEach(r => {
+      const h = hours[parseInt(r.hour_start_et.slice(11, 13), 10)];
+      h.notional += r.dollar_volume;
+      h.net += r.net_taker_dollar_volume;
+      h.hours += 1;
+      if (r.net_taker_dollar_volume > 0) h.buy_hours += 1;
+    });
+    const total = hours.reduce((s, h) => s + h.notional, 0);
+    hours.forEach(h => {
+      h.avg_notional = tradeDays ? h.notional / tradeDays : 0;
+      h.avg_net = tradeDays ? h.net / tradeDays : 0;
+      h.share = total ? 100 * h.notional / total : 0;
+    });
+    return { tradeDays, hours };
+  }
+
+  // ---- charts -------------------------------------------------------------------------
+  function destroyCharts() { charts.forEach(c => c.destroy()); charts = []; }
+
+  function tooltipStyle(extra) {
+    return Object.assign({
+      backgroundColor: '#161c24', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+      titleColor: '#8a9099', bodyColor: '#f0f2f5',
+      titleFont: { family: MONO, size: 10 }, bodyFont: { family: MONO, size: 11 },
+    }, extra);
+  }
+  function axes(yFormat, extraY) {
+    return {
+      x: { grid: { display: false }, ticks: { color: '#8a9099', font: { family: MONO, size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 12 }, border: { color: 'rgba(255,255,255,0.07)' } },
+      y: Object.assign({ grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#8a9099', font: { family: MONO, size: 10 }, callback: yFormat, maxTicksLimit: 6 }, border: { display: false } }, extraY || {}),
+    };
+  }
+  function addChart(id, config) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return;
+    config.options = Object.assign({ responsive: true, maintainAspectRatio: false, animation: { duration: 300 }, interaction: { mode: 'index', intersect: false } }, config.options);
+    charts.push(new Chart(canvas, config));
+  }
+  function signedColors(values, alpha) {
+    return values.map(v => v >= 0 ? 'rgba(0,229,160,' + alpha + ')' : 'rgba(255,77,109,' + alpha + ')');
+  }
+
+  // ---- rendering ----------------------------------------------------------------------
+  function sparkBars(values) {
+    const w = 200, h = 34, n = values.length || 1, max = Math.max(1, ...values.map(v => Math.abs(v)));
+    const slot = w / n, bw = Math.max(1, slot * 0.72), mid = h / 2;
+    let out = '<svg viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true">' +
+      '<line x1="0" x2="' + w + '" y1="' + mid + '" y2="' + mid + '" stroke="rgba(255,255,255,0.12)" stroke-width="0.6"/>';
+    values.forEach((v, i) => {
+      if (!v) return;
+      const bh = Math.max(1, Math.abs(v) / max * (mid - 1));
+      out += '<rect x="' + (i * slot + (slot - bw) / 2).toFixed(2) + '" y="' + (v > 0 ? mid - bh : mid).toFixed(2) +
+        '" width="' + bw.toFixed(2) + '" height="' + bh.toFixed(2) + '" rx="1" fill="' + (v > 0 ? '#00e5a0' : '#ff4d6d') + '" opacity="0.85"/>';
+    });
+    return out + '</svg>';
+  }
+
+  function renderTiles() {
+    const box = document.getElementById('tiles');
+    box.innerHTML = markets.map(m => {
+      const s = summaryFor(m.perp_id);
+      return '<button class="tile' + (m.perp_id === selected ? ' selected' : '') + '" data-perp="' + esc(m.perp_id) + '" title="' +
+        esc(marketName(m) + ': net taker flow ' + usdSigned(s.net) + ' over ' + s.days + ' trading days') + '">' +
+        '<div class="tile-top"><span class="tile-name">' + esc(m.label) + '</span>' +
+        '<span class="tile-total ' + signClass(s.net) + '">' + esc(usdSigned(s.net)) + '</span></div>' +
+        sparkBars(rowsFor(m.perp_id).map(r => r.net_taker_dollar_volume)) +
+        '<div class="tile-foot"><span><span class="swatch" style="background:' + venueColor(m.venue) + '"></span> ' + esc(m.venue.toUpperCase()) + '</span>' +
+        '<span>' + esc(usd(s.notional)) + ' traded · ' + esc(pctSigned(s.net_pct)) + '</span></div>' +
+        '</button>';
+    }).join('');
+    box.querySelectorAll('.tile').forEach(t => t.addEventListener('click', () => {
+      selected = t.dataset.perp;
+      renderTiles();
+      renderDetail();
+      document.getElementById('detail').scrollIntoView({behavior: 'smooth', block: 'start'});
+    }));
+  }
+
+  function renderDetail() {
+    destroyCharts();
+    const m = markets.find(x => x.perp_id === selected);
+    const rows = enriched(selected);
+    const s = summaryFor(selected);
+    const pattern = hourlyPattern(selected);
+    const hasAccounts = rows.some(r => r.accounts_long != null);
+    const box = document.getElementById('detail');
+    if (!rows.length) {
+      box.innerHTML = '<div class="panel"><div class="state-box"><div class="state-title">NO TRADES IN THIS WINDOW</div>' +
+        '<div class="state-sub">' + esc(marketName(m)) + ' has no trading days in the last ' + days + ' days.</div></div></div>';
+      renderCompare();
+      return;
+    }
+    box.innerHTML =
+      '<div class="panel">' +
+        '<div class="panel-header"><div><div class="panel-title">' + esc(marketName(m).toUpperCase()) + ' · DAILY NET TAKER FLOW</div>' +
+        '<div class="panel-sub">' + esc(rows[0].end_period_date) + ' to ' + esc(rows[rows.length - 1].end_period_date) + ' (ET, completed days) · taker buys − taker sells, notional $</div></div>' +
+        '<div class="panel-note">Green = takers net buying · red = net selling</div></div>' +
+        '<div class="stats">' +
+          stat('Net taker flow', usdSigned(s.net), signClass(s.net)) +
+          stat('Notional traded', usd(s.notional)) +
+          stat('Net % of volume', pctSigned(s.net_pct), signClass(s.net_pct)) +
+          stat('Days net buying', s.buy_days + ' of ' + s.days) +
+          stat('Latest day', s.last.end_period_date + ' · ' + usdSigned(s.last.net_taker_dollar_volume), signClass(s.last.net_taker_dollar_volume)) +
+        '</div>' +
+        '<div class="chart-wrap"><canvas id="c-net"></canvas></div>' +
+      '</div>' +
+      '<div class="grid2">' +
+        '<div class="panel"><div class="panel-header"><div><div class="panel-title">' + (hasAccounts ? 'BUY SHARE &amp; POSITIONING' : 'TAKER BUY SHARE') + '</div>' +
+          '<div class="panel-sub">Share of each day\'s volume bought by takers' + (hasAccounts ? ' · share of accounts holding a long' : '') + ' · 50% = balanced</div></div>' +
+          '<div class="panel-note"><span class="key"><span class="swatch" style="background:#00e5a0"></span>Taker buys</span>' +
+          (hasAccounts ? '<span class="key"><span class="swatch" style="background:#f0a500"></span>Accounts long</span>' : '') + '</div></div>' +
+          '<div class="chart-wrap short"><canvas id="c-share"></canvas></div></div>' +
+        '<div class="panel"><div class="panel-header"><div><div class="panel-title">AVERAGE NOTIONAL BY ET HOUR</div>' +
+          '<div class="panel-sub">Weekdays, last ' + HOURLY_DAYS + ' days (' + pattern.tradeDays + ' trading days) · bright = US cash session</div></div></div>' +
+          '<div class="chart-wrap short"><canvas id="c-hour"></canvas></div></div>' +
+      '</div>' +
+      '<div class="panel"><div class="panel-header"><div><div class="panel-title">AVERAGE NET TAKER FLOW BY ET HOUR</div>' +
+        '<div class="panel-sub">When in the day takers lean to buying or selling · weekdays, last ' + HOURLY_DAYS + ' days</div></div></div>' +
+        '<div class="chart-wrap short"><canvas id="c-hournet"></canvas></div>' +
+        '<div id="day-table"></div>' +
+      '</div>';
+
+    // Daily net flow
+    const nets = rows.map(r => r.net_taker_dollar_volume);
+    addChart('c-net', {
+      type: 'bar',
+      data: { labels: rows.map(r => shortDate(r.end_period_date)), datasets: [{ data: nets, backgroundColor: signedColors(nets, 0.75), hoverBackgroundColor: signedColors(nets, 1), borderRadius: 2, maxBarThickness: 26 }] },
+      options: {
+        plugins: { legend: { display: false }, tooltip: tooltipStyle({ callbacks: {
+          title: items => dowName(rows[items[0].dataIndex].end_period_date) + ' ' + rows[items[0].dataIndex].end_period_date,
+          label: () => '',
+          afterBody: items => {
+            const r = rows[items[0].dataIndex];
+            const lines = [' Net flow     ' + usdSigned(r.net_taker_dollar_volume), ' Net % of vol ' + pctSigned(r.net_pct),
+              ' Notional     ' + usd(r.dollar_volume), ' Trades       ' + whole(r.trade_count)];
+            if (r.oi_chg != null) lines.push(' OI change    ' + usdSigned(r.oi_chg));
+            return lines;
+          },
+        } }) },
+        scales: axes(v => usdSigned(v)),
+      },
+    });
+
+    // Buy share (+ accounts long)
+    const shareSets = [{ label: 'Taker buys', data: rows.map(r => r.buy_share), borderColor: '#00e5a0', backgroundColor: '#00e5a0', borderWidth: 1.6, pointRadius: rows.length > 60 ? 0 : 2, tension: 0.2, spanGaps: true }];
+    if (hasAccounts) shareSets.push({ label: 'Accounts long', data: rows.map(r => r.accounts_long), borderColor: '#f0a500', backgroundColor: '#f0a500', borderWidth: 1.6, pointRadius: rows.length > 60 ? 0 : 2, tension: 0.2, spanGaps: true });
+    shareSets.push({ label: 'Balanced', data: rows.map(() => 50), borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderDash: [4, 3], pointRadius: 0 });
+    const shareVals = rows.flatMap(r => [r.buy_share, r.accounts_long]).filter(v => v != null);
+    addChart('c-share', {
+      type: 'line',
+      data: { labels: rows.map(r => shortDate(r.end_period_date)), datasets: shareSets },
+      options: {
+        plugins: { legend: { display: false }, tooltip: tooltipStyle({ filter: i => i.dataset.label !== 'Balanced', callbacks: {
+          title: items => rows[items[0].dataIndex].end_period_date,
+          label: i => ' ' + i.dataset.label + ' ' + pct(i.raw),
+        } }) },
+        scales: axes(v => v + '%', { min: Math.max(0, Math.floor(Math.min(40, ...shareVals) / 10) * 10),
+          max: Math.min(100, Math.ceil(Math.max(60, ...shareVals) / 10) * 10), ticks: { color: '#8a9099', font: { family: MONO, size: 10 }, callback: v => v + '%', stepSize: 10 } }),
+      },
+    });
+
+    // Hourly pattern
+    const hourLabels = pattern.hours.map(h => String(h.hour));
+    const inCash = h => h.hour >= CASH_START && h.hour <= CASH_END;
+    const hourTip = items => {
+      const h = pattern.hours[items[0].dataIndex];
+      return [' Avg notional ' + usd(h.avg_notional), ' Share of day ' + pct(h.share), ' Avg net flow ' + usdSigned(h.avg_net),
+        ' Net buying   ' + h.buy_hours + ' of ' + h.hours + ' hours traded'];
+    };
+    addChart('c-hour', {
+      type: 'bar',
+      data: { labels: hourLabels, datasets: [{ data: pattern.hours.map(h => h.avg_notional),
+        backgroundColor: pattern.hours.map(h => inCash(h) ? 'rgba(77,166,255,0.85)' : 'rgba(77,166,255,0.35)'), borderRadius: 2 }] },
+      options: {
+        plugins: { legend: { display: false }, tooltip: tooltipStyle({ callbacks: { title: items => items[0].label + ':00–' + items[0].label + ':59 ET', label: () => '', afterBody: hourTip } }) },
+        scales: axes(v => usd(v), { beginAtZero: true }),
+      },
+    });
+    const hourNets = pattern.hours.map(h => h.avg_net);
+    addChart('c-hournet', {
+      type: 'bar',
+      data: { labels: hourLabels, datasets: [{ data: hourNets,
+        backgroundColor: pattern.hours.map((h, i) => (hourNets[i] >= 0 ? 'rgba(0,229,160,' : 'rgba(255,77,109,') + (inCash(h) ? '0.85)' : '0.4)')), borderRadius: 2 }] },
+      options: {
+        plugins: { legend: { display: false }, tooltip: tooltipStyle({ callbacks: { title: items => items[0].label + ':00–' + items[0].label + ':59 ET', label: () => '', afterBody: hourTip } }) },
+        scales: axes(v => usdSigned(v)),
+      },
+    });
+
+    renderDayTable(rows, hasAccounts);
+    renderCompare();
+  }
+
+  function stat(label, value, cls) {
+    return '<div class="stat"><span class="stat-label">' + esc(label) + '</span><span class="stat-value ' + (cls || '') + '">' + esc(value) + '</span></div>';
+  }
+
+  function renderDayTable(rows, hasAccounts) {
+    const head = ['Day', 'Trades', 'Notional', 'Taker buys', 'Taker sells', 'Net flow', 'Net %', 'Open interest', 'OI change']
+      .concat(hasAccounts ? ['Accounts long'] : []);
+    document.getElementById('day-table').innerHTML =
+      '<div class="list-meta">Daily detail, newest first · open interest at end of day</div>' +
+      '<div class="table-wrap"><table class="flows"><thead><tr>' +
+      head.map((h, i) => '<th' + (i ? ' class="num"' : '') + '>' + esc(h) + '</th>').join('') + '</tr></thead><tbody>' +
+      rows.slice().reverse().map(r =>
+        '<tr><td class="mono">' + esc(dowName(r.end_period_date) + ' ' + r.end_period_date) + '</td>' +
+        '<td class="num">' + esc(whole(r.trade_count)) + '</td>' +
+        '<td class="num">' + esc(usd(r.dollar_volume)) + '</td>' +
+        '<td class="num">' + esc(usd(r.taker_buy_dollar_volume)) + '</td>' +
+        '<td class="num">' + esc(usd(r.taker_sell_dollar_volume)) + '</td>' +
+        '<td class="num ' + signClass(r.net_taker_dollar_volume) + '">' + esc(usdSigned(r.net_taker_dollar_volume)) + '</td>' +
+        '<td class="num ' + signClass(r.net_pct) + '">' + esc(pctSigned(r.net_pct)) + '</td>' +
+        '<td class="num">' + esc(usd(r.open_interest_usd)) + '</td>' +
+        '<td class="num ' + signClass(r.oi_chg) + '">' + esc(usdSigned(r.oi_chg)) + '</td>' +
+        (hasAccounts ? '<td class="num">' + esc(pct(r.accounts_long)) + '</td>' : '') + '</tr>'
+      ).join('') + '</tbody></table></div>';
+  }
+
+  // Same underlying on more than one venue: compare daily net flow as a % of each venue's
+  // volume (takes out the difference in size) on the days they all traded.
+  function renderCompare() {
+    const box = document.getElementById('compare');
+    const m = markets.find(x => x.perp_id === selected);
+    const group = markets.filter(x => x.label === m.label);
+    if (group.length < 2) { box.innerHTML = ''; return; }
+    const byPerp = Object.fromEntries(group.map(g => [g.perp_id, Object.fromEntries(enriched(g.perp_id).map(r => [r.end_period_date, r]))]));
+    const shared = Object.keys(byPerp[group[0].perp_id]).filter(d => group.every(g => byPerp[g.perp_id][d])).sort();
+    if (!shared.length) {
+      box.innerHTML = '<div class="panel"><div class="panel-title">' + esc(m.label.toUpperCase()) + ' ACROSS VENUES</div>' +
+        '<div class="panel-sub">No days in this window where every venue traded.</div></div>';
+      return;
+    }
+    const a = group[0], b = group[1];
+    const same = shared.filter(d => Math.sign(byPerp[a.perp_id][d].net_taker_dollar_volume) === Math.sign(byPerp[b.perp_id][d].net_taker_dollar_volume)).length;
+    const corr = correlation(shared.map(d => byPerp[a.perp_id][d].net_pct), shared.map(d => byPerp[b.perp_id][d].net_pct));
+    box.innerHTML = '<div class="panel">' +
+      '<div class="panel-header"><div><div class="panel-title">' + esc(m.label.toUpperCase()) + ' ACROSS VENUES · NET FLOW AS % OF VOLUME</div>' +
+      '<div class="panel-sub">' + shared.length + ' shared trading days · each bar is that venue\'s net taker flow ÷ its own volume</div></div>' +
+      '<div class="panel-note">' + group.map(g => '<span class="key"><span class="swatch" style="background:' + venueColor(g.venue) + '"></span>' + esc(g.venue) + '</span>').join('') + '</div></div>' +
+      '<div class="stats">' + stat('Same direction', same + ' of ' + shared.length + ' days') +
+        stat('Correlation', corr == null ? 'needs 5+ days' : corr.toFixed(2)) +
+        group.map(g => stat(g.venue + ' net', usdSigned(shared.reduce((s, d) => s + byPerp[g.perp_id][d].net_taker_dollar_volume, 0)),
+          signClass(shared.reduce((s, d) => s + byPerp[g.perp_id][d].net_taker_dollar_volume, 0)))).join('') + '</div>' +
+      '<div class="chart-wrap"><canvas id="c-compare"></canvas></div></div>';
+    addChart('c-compare', {
+      type: 'bar',
+      data: { labels: shared.map(shortDate), datasets: group.map(g => ({
+        label: g.venue, data: shared.map(d => byPerp[g.perp_id][d].net_pct),
+        backgroundColor: venueColor(g.venue), borderRadius: 2, maxBarThickness: 14 })) },
+      options: {
+        plugins: { legend: { display: false }, tooltip: tooltipStyle({ callbacks: {
+          title: items => shared[items[0].dataIndex],
+          label: i => ' ' + i.dataset.label + ' ' + pctSigned(i.raw) + ' (' + usdSigned(byPerp[group[i.datasetIndex].perp_id][shared[i.dataIndex]].net_taker_dollar_volume) + ')',
+        } }) },
+        scales: axes(v => pctSigned(v, 0)),
+      },
+    });
+  }
+
+  function correlation(xs, ys) {
+    const n = xs.length;
+    if (n < 5) return null;
+    const mx = xs.reduce((s, v) => s + v, 0) / n, my = ys.reduce((s, v) => s + v, 0) / n;
+    let sxy = 0, sxx = 0, syy = 0;
+    for (let i = 0; i < n; i++) { sxy += (xs[i] - mx) * (ys[i] - my); sxx += (xs[i] - mx) ** 2; syy += (ys[i] - my) ** 2; }
+    return sxx && syy ? sxy / Math.sqrt(sxx * syy) : null;
+  }
+
+  // ---- loading ------------------------------------------------------------------------
+  async function getJson(path) {
+    const res = await fetch(API_BASE + path);
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || res.statusText);
+    return body;
+  }
+
+  async function load() {
+    const seq = ++loadSeq;
+    document.querySelectorAll('#quick-days .chip').forEach(b => b.classList.toggle('active', Number(b.dataset.days) === days));
+    document.getElementById('results-count').textContent = 'Loading…';
+    if (!markets.length) {
+      document.getElementById('tiles').innerHTML =
+        '<div class="state-box" style="grid-column:1/-1"><div class="spinner"></div><div class="state-title">LOADING FLOWS</div></div>';
+    }
+    try {
+      const [mk, dy, hr] = await Promise.all([
+        getJson('/get_markets'),
+        getJson('/get_daily?days_history=' + days),
+        hourly.length ? Promise.resolve(hourly) : getJson('/get_hourly?days_history=' + HOURLY_DAYS),
+      ]);
+      if (seq !== loadSeq) return;
+      markets = mk; daily = dy; hourly = hr;
+      if (!markets.length) {
+        document.getElementById('results-count').textContent = 'No flow data yet';
+        document.getElementById('tiles').innerHTML =
+          '<div class="state-box" style="grid-column:1/-1"><div class="state-title">NO FLOW DATA YET</div><div class="state-sub">Flows are published once a day for completed days. Please check back later.</div></div>';
+        document.getElementById('detail').innerHTML = '';
+        document.getElementById('compare').innerHTML = '';
+        return;
+      }
+      if (!markets.some(m => m.perp_id === selected)) selected = markets[0].perp_id;
+      const dates = daily.map(r => r.end_period_date).sort();
+      document.getElementById('results-count').textContent =
+        markets.length + ' perpetual markets · ' + new Set(markets.map(m => m.venue)).size + ' venues · ' +
+        (dates.length ? dates[0] + ' to ' + dates[dates.length - 1] + ' (ET, completed days)' : 'no trades in this window');
+      renderTiles();
+      renderDetail();
+    } catch (err) {
+      if (seq !== loadSeq) return;
+      document.getElementById('results-count').innerHTML = '<span class="error">Could not load data: ' + esc(err.message) + '</span>';
+      if (!markets.length) {
+        document.getElementById('tiles').innerHTML =
+          '<div class="state-box" style="grid-column:1/-1"><div class="state-title">DATA UNAVAILABLE</div><div class="state-sub">Please try again in a few minutes.</div></div>';
+      }
+    }
+  }
+
+  document.querySelectorAll('#quick-days .chip').forEach(b => b.addEventListener('click', () => {
+    days = Number(b.dataset.days);
+    load();
+  }));
+
+  load();
+</script>
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07); line-height:1.7;">Taker flow splits each trade by the side that crossed the spread: a taker buy lifts the offer, a taker sell hits the bid. Net taker flow is taker buys minus taker sells in notional dollars (underlying exposure traded, not margin). A taker buy can open a long or close a short, so read it with the change in open interest. Days are US Eastern; only completed days are shown. Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+<div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
+</div>
+</body>
+</html>
