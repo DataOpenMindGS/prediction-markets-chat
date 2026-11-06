@@ -215,6 +215,7 @@
   }
   function usdSigned(v) { return v == null ? '–' : (v > 0 ? '+' : '') + usd(v); }
   function pct(v, d) { return v == null ? '–' : v.toFixed(d == null ? 1 : d) + '%'; }
+  function fundingPct(v) { return v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(4) + '%'; }
   function pctSigned(v, d) { return v == null ? '–' : (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(d == null ? 1 : d) + '%'; }
   function signClass(v) { return v > 0 ? 'pos' : v < 0 ? 'neg' : ''; }
   function shortDate(iso) { const [, m, d] = iso.split('-'); return Number(m) + '/' + Number(d); }
@@ -235,13 +236,15 @@
     const rows = rowsFor(perpId);
     return rows.map((r, i) => {
       const prev = i > 0 ? rows[i - 1] : null;
-      const accounts = r.long_accounts != null && r.short_accounts != null && r.long_accounts + r.short_accounts > 0
-        ? 100 * r.long_accounts / (r.long_accounts + r.short_accounts) : null;
+      const share = (l, s) => l != null && s != null && l + s > 0 ? 100 * l / (l + s) : null;
       return Object.assign({}, r, {
         net_pct: r.dollar_volume ? 100 * r.net_taker_dollar_volume / r.dollar_volume : null,
         buy_share: r.dollar_volume ? 100 * r.taker_buy_dollar_volume / r.dollar_volume : null,
         oi_chg: prev && prev.open_interest_usd != null && r.open_interest_usd != null ? r.open_interest_usd - prev.open_interest_usd : null,
-        accounts_long: accounts,
+        accounts_long: share(r.long_accounts, r.short_accounts),
+        top_long: share(r.top_long_accounts, r.top_short_accounts),
+        funding_pct: r.funding_rate != null ? 100 * r.funding_rate : null,
+        liq_usd: r.liquidation_dollar_volume != null ? r.liquidation_dollar_volume : null,
       });
     });
   }
@@ -348,6 +351,9 @@
     const s = summaryFor(selected);
     const pattern = hourlyPattern(selected);
     const hasAccounts = rows.some(r => r.accounts_long != null);
+    const hasTop = rows.some(r => r.top_long != null);
+    const hasFunding = rows.some(r => r.funding_pct != null);
+    const hasLiq = rows.some(r => r.liq_usd != null);
     const box = document.getElementById('detail');
     if (!rows.length) {
       box.innerHTML = '<div class="panel"><div class="state-box"><div class="state-title">NO TRADES IN THIS WINDOW</div>' +
@@ -371,14 +377,17 @@
       '</div>' +
       '<div class="grid2">' +
         '<div class="panel"><div class="panel-header"><div><div class="panel-title">' + (hasAccounts ? 'BUY SHARE &amp; POSITIONING' : 'TAKER BUY SHARE') + '</div>' +
-          '<div class="panel-sub">Share of each day\'s volume bought by takers' + (hasAccounts ? ' · share of accounts holding a long' : '') + ' · 50% = balanced</div></div>' +
+          '<div class="panel-sub">Share of each day\'s volume bought by takers' + (hasAccounts ? ' · share of accounts holding a long' : '') +
+          (hasTop ? ', overall and among the largest 20% of accounts' : '') + ' · 50% = balanced</div></div>' +
           '<div class="panel-note"><span class="key"><span class="swatch" style="background:#00e5a0"></span>Taker buys</span>' +
-          (hasAccounts ? '<span class="key"><span class="swatch" style="background:#f0a500"></span>Accounts long</span>' : '') + '</div></div>' +
+          (hasAccounts ? '<span class="key"><span class="swatch" style="background:#f0a500"></span>Accounts long</span>' : '') +
+          (hasTop ? '<span class="key"><span class="swatch" style="background:#e879f9"></span>Largest accounts long</span>' : '') + '</div></div>' +
           '<div class="chart-wrap short"><canvas id="c-share"></canvas></div></div>' +
         '<div class="panel"><div class="panel-header"><div><div class="panel-title">AVERAGE NOTIONAL BY ET HOUR</div>' +
           '<div class="panel-sub">Weekdays, last ' + HOURLY_DAYS + ' days (' + pattern.tradeDays + ' trading days) · bright = US cash session</div></div></div>' +
           '<div class="chart-wrap short"><canvas id="c-hour"></canvas></div></div>' +
       '</div>' +
+      (hasFunding || hasLiq ? fundingPanel(rows, hasFunding, hasLiq) : '') +
       '<div class="panel"><div class="panel-header"><div><div class="panel-title">AVERAGE NET TAKER FLOW BY ET HOUR</div>' +
         '<div class="panel-sub">When in the day takers lean to buying or selling · weekdays, last ' + HOURLY_DAYS + ' days</div></div></div>' +
         '<div class="chart-wrap short"><canvas id="c-hournet"></canvas></div>' +
@@ -399,6 +408,8 @@
             const lines = [' Net flow     ' + usdSigned(r.net_taker_dollar_volume), ' Net % of vol ' + pctSigned(r.net_pct),
               ' Notional     ' + usd(r.dollar_volume), ' Trades       ' + whole(r.trade_count)];
             if (r.oi_chg != null) lines.push(' OI change    ' + usdSigned(r.oi_chg));
+            if (r.liq_usd) lines.push(' Liquidated   ' + usd(r.liq_usd));
+            if (r.funding_pct != null) lines.push(' Funding      ' + fundingPct(r.funding_pct));
             return lines;
           },
         } }) },
@@ -409,8 +420,9 @@
     // Buy share (+ accounts long)
     const shareSets = [{ label: 'Taker buys', data: rows.map(r => r.buy_share), borderColor: '#00e5a0', backgroundColor: '#00e5a0', borderWidth: 1.6, pointRadius: rows.length > 60 ? 0 : 2, tension: 0.2, spanGaps: true }];
     if (hasAccounts) shareSets.push({ label: 'Accounts long', data: rows.map(r => r.accounts_long), borderColor: '#f0a500', backgroundColor: '#f0a500', borderWidth: 1.6, pointRadius: rows.length > 60 ? 0 : 2, tension: 0.2, spanGaps: true });
+    if (hasTop) shareSets.push({ label: 'Largest accounts long', data: rows.map(r => r.top_long), borderColor: '#e879f9', backgroundColor: '#e879f9', borderWidth: 1.6, pointRadius: rows.length > 60 ? 0 : 2, tension: 0.2, spanGaps: true });
     shareSets.push({ label: 'Balanced', data: rows.map(() => 50), borderColor: 'rgba(255,255,255,0.25)', borderWidth: 1, borderDash: [4, 3], pointRadius: 0 });
-    const shareVals = rows.flatMap(r => [r.buy_share, r.accounts_long]).filter(v => v != null);
+    const shareVals = rows.flatMap(r => [r.buy_share, r.accounts_long, r.top_long]).filter(v => v != null);
     addChart('c-share', {
       type: 'line',
       data: { labels: rows.map(r => shortDate(r.end_period_date)), datasets: shareSets },
@@ -452,17 +464,62 @@
       },
     });
 
-    renderDayTable(rows, hasAccounts);
+    // Funding (line, right axis) and liquidations (bars, left axis)
+    if (hasFunding || hasLiq) {
+      const sets = [];
+      if (hasLiq) sets.push({ type: 'bar', label: 'Liquidated', data: rows.map(r => r.liq_usd || 0), yAxisID: 'y',
+        backgroundColor: 'rgba(240,165,0,0.7)', hoverBackgroundColor: '#f0a500', borderRadius: 2, maxBarThickness: 22, order: 2 });
+      if (hasFunding) sets.push({ type: 'line', label: 'Funding', data: rows.map(r => r.funding_pct), yAxisID: 'y1',
+        borderColor: '#4da6ff', backgroundColor: '#4da6ff', borderWidth: 1.6, pointRadius: rows.length > 60 ? 0 : 2, tension: 0.2, spanGaps: true, order: 1 });
+      const sc = axes(v => usd(v), { beginAtZero: true, display: hasLiq });
+      sc.y1 = { position: 'right', display: hasFunding, grid: { display: !hasLiq, color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#8a9099', font: { family: MONO, size: 10 }, callback: v => fundingPct(v), maxTicksLimit: 6 }, border: { display: false } };
+      addChart('c-funding', {
+        type: 'bar',
+        data: { labels: rows.map(r => shortDate(r.end_period_date)), datasets: sets },
+        options: {
+          plugins: { legend: { display: false }, tooltip: tooltipStyle({ callbacks: {
+            title: items => rows[items[0].dataIndex].end_period_date,
+            label: i => ' ' + i.dataset.label + ' ' + (i.dataset.yAxisID === 'y1' ? fundingPct(i.raw) : usd(i.raw)),
+          } }) },
+          scales: sc,
+        },
+      });
+    }
+
+    renderDayTable(rows, hasAccounts, hasTop, hasFunding, hasLiq);
     renderCompare();
+  }
+
+  function fundingPanel(rows, hasFunding, hasLiq) {
+    const liqTotal = rows.reduce((s, r) => s + (r.liq_usd || 0), 0);
+    const liqDays = rows.filter(r => r.liq_usd > 0).length;
+    const lastFunding = rows.slice().reverse().find(r => r.funding_pct != null);
+    const avgFunding = rows.filter(r => r.funding_pct != null);
+    const title = [hasFunding ? 'FUNDING RATE' : null, hasLiq ? 'LIQUIDATIONS' : null].filter(Boolean).join(' &amp; ');
+    return '<div class="panel"><div class="panel-header"><div><div class="panel-title">' + title + '</div>' +
+      '<div class="panel-sub">' + [hasFunding ? 'Funding at the end of each day (positive = longs pay shorts)' : null,
+        hasLiq ? 'positions force-closed each day, longs and shorts combined' : null].filter(Boolean).join(' · ') + '</div></div>' +
+      '<div class="panel-note">' + (hasLiq ? '<span class="key"><span class="swatch" style="background:#f0a500"></span>Liquidated ($)</span>' : '') +
+      (hasFunding ? '<span class="key"><span class="swatch" style="background:#4da6ff"></span>Funding</span>' : '') + '</div></div>' +
+      '<div class="stats">' +
+        (hasFunding ? stat('Latest funding', fundingPct(lastFunding ? lastFunding.funding_pct : null), signClass(lastFunding ? lastFunding.funding_pct : 0)) +
+          stat('Average funding', fundingPct(avgFunding.length ? avgFunding.reduce((s, r) => s + r.funding_pct, 0) / avgFunding.length : null)) : '') +
+        (hasLiq ? stat('Liquidated', usd(liqTotal)) + stat('Days with liquidations', liqDays + ' of ' + rows.length) : '') +
+      '</div>' +
+      '<div class="chart-wrap short"><canvas id="c-funding"></canvas></div></div>';
   }
 
   function stat(label, value, cls) {
     return '<div class="stat"><span class="stat-label">' + esc(label) + '</span><span class="stat-value ' + (cls || '') + '">' + esc(value) + '</span></div>';
   }
 
-  function renderDayTable(rows, hasAccounts) {
+  function renderDayTable(rows, hasAccounts, hasTop, hasFunding, hasLiq) {
     const head = ['Day', 'Trades', 'Notional', 'Taker buys', 'Taker sells', 'Net flow', 'Net %', 'Open interest', 'OI change']
-      .concat(hasAccounts ? ['Accounts long'] : []);
+      .concat(hasAccounts ? ['Accounts long'] : [])
+      .concat(hasTop ? ['Largest accts long'] : [])
+      .concat(hasFunding ? ['Funding'] : [])
+      .concat(hasLiq ? ['Liquidated'] : []);
     document.getElementById('day-table').innerHTML =
       '<div class="list-meta">Daily detail, newest first · open interest at end of day</div>' +
       '<div class="table-wrap"><table class="flows"><thead><tr>' +
@@ -477,7 +534,10 @@
         '<td class="num ' + signClass(r.net_pct) + '">' + esc(pctSigned(r.net_pct)) + '</td>' +
         '<td class="num">' + esc(usd(r.open_interest_usd)) + '</td>' +
         '<td class="num ' + signClass(r.oi_chg) + '">' + esc(usdSigned(r.oi_chg)) + '</td>' +
-        (hasAccounts ? '<td class="num">' + esc(pct(r.accounts_long)) + '</td>' : '') + '</tr>'
+        (hasAccounts ? '<td class="num">' + esc(pct(r.accounts_long)) + '</td>' : '') +
+        (hasTop ? '<td class="num">' + esc(pct(r.top_long)) + '</td>' : '') +
+        (hasFunding ? '<td class="num ' + signClass(r.funding_pct) + '">' + esc(fundingPct(r.funding_pct)) + '</td>' : '') +
+        (hasLiq ? '<td class="num">' + esc(r.liq_usd ? usd(r.liq_usd) : '–') + '</td>' : '') + '</tr>'
       ).join('') + '</tbody></table></div>';
   }
 
@@ -587,7 +647,7 @@
 
   load();
 </script>
-<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07); line-height:1.7;">Taker flow splits each trade by the side that crossed the spread: a taker buy lifts the offer, a taker sell hits the bid. Net taker flow is taker buys minus taker sells in notional dollars (underlying exposure traded, not margin). A taker buy can open a long or close a short, so read it with the change in open interest. Days are US Eastern; only completed days are shown. Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
+<div style="padding:12px 16px; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; border-top:1px solid rgba(255,255,255,0.07); line-height:1.7;">Taker flow splits each trade by the side that crossed the spread: a taker buy lifts the offer, a taker sell hits the bid. Net taker flow is taker buys minus taker sells in notional dollars (underlying exposure traded, not margin). A taker buy can open a long or close a short, so read it with the change in open interest. Where a venue publishes them, positioning shows the share of accounts holding a long (overall, and among the largest 20% of accounts, which hold most of the open interest), the funding rate (positive = longs pay shorts) and liquidations (positions force-closed). Days are US Eastern; only completed days are shown. Questions? <a href="mailto:Info@OpenMindData.io" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">Info@OpenMindData.io</a></div>
 <div style="font-family:'IBM Plex Mono',monospace; font-size:10px; color:#8a9099; letter-spacing:0.04em; margin-top:4px; text-align:center; padding-bottom:12px;">&copy; 2026 Open Mind Data LLC &nbsp;·&nbsp; <a href="https://www.openminddata.io" target="_blank" style="color:#00b87a; text-decoration:none; border-bottom:1px solid rgba(0,184,122,0.3);">openminddata.io</a></div>
 </div>
 </body>
